@@ -1,6 +1,6 @@
 # CodeReview BOT
 
-> A code review robot powered by ChatGPT
+> An AI-powered code review bot
 
 Translation Versions: [ENGLISH](./README.md) | [简体中文](./README.zh-CN.md) | [繁體中文](./README.zh-TW.md) | [한국어](./README.ko.md) | [日本語](./README.ja.md)
 
@@ -17,7 +17,7 @@ Install: [apps/cr-gpt](https://github.com/apps/cr-gpt);
 1. Go to the repo homepage which you want integrate this bot
 2. click `settings`
 3. click `actions` under `secrets and variables`
-4. Change to `Variables` tab, create a new variable `OPENAI_API_KEY` with the value of your open api key (For Github Action integration, set it in secrets)
+4. For the hosted bot, create a repository variable named `GEMINI_API_KEY` with a key from [Google AI Studio](https://aistudio.google.com/app/apikey). For GitHub Actions, add the key as a `GEMINI_API_KEY` secret.
    <img width="1465" alt="image" src="https://user-images.githubusercontent.com/13167934/218533628-3974b70f-c423-44b0-b096-d1ec2ace85ea.png">
 
 ### Start using
@@ -35,7 +35,7 @@ example:
 
 [actions/chatgpt-codereviewer](https://github.com/marketplace/actions/chatgpt-codereviewer)
 
-1. add the `OPENAI_API_KEY` to your github actions secrets
+1. Add the `GEMINI_API_KEY` to your GitHub Actions secrets
 2. create `.github/workflows/cr.yml` add bellow content
 
 ```yml
@@ -44,7 +44,6 @@ name: Code Review
 permissions:
   contents: read
   pull-requests: write
-  models: true # if you choose use github models, set this to be true
 
 on:
   pull_request:
@@ -59,26 +58,15 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-          # if use github models https://github.com/marketplace/models
-          USE_GITHUB_MODELS: true
-          MODEL: openai/gpt-4o
-
-          # else if use azure deployment
-          AZURE_API_VERSION: xx
-          AZURE_DEPLOYMENT: xx
-
-          # else use standard llm model
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          OPENAI_API_ENDPOINT: https://api.openai.com/v1
-          MODEL: gpt-3.5-turbo # https://platform.openai.com/docs/models
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          MODEL: gemini-2.5-flash # https://ai.google.dev/gemini-api/docs/models
 
           # common
           LANGUAGE: Chinese
           PROMPT: # example: Please check if there are any confusions or irregularities in the following code diff:
-          top_p: 1 # https://platform.openai.com/docs/api-reference/chat/create#chat/create-top_p
-          temperature: 1 # https://platform.openai.com/docs/api-reference/chat/create#chat/create-temperature
+          top_p: 1
+          temperature: 1
           max_tokens: 10000
-          # REASONING_EFFORT: low # optional; only for reasoning models (e.g. gpt-5.4, gpt-5.5), values (model support varies): none, minimal, low, medium, high, xhigh
           MAX_PATCH_LENGTH: 10000 # if the patch/diff length is large than MAX_PATCH_LENGTH, will be ignored and won't review. By default, with no MAX_PATCH_LENGTH set, there is also no limit for the patch/diff length.
           IGNORE_PATTERNS: /node_modules/**/*,*.md # glob pattern or regex pattern to ignore files, separated by comma
           INCLUDE_PATTERNS: *.js,*.ts # glob pattern or regex pattern to include files, separated by comma

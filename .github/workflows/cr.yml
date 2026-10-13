@@ -3,7 +3,6 @@ name: Code Review
 permissions:
   contents: read
   pull-requests: write
-  models: read
 
 on:
   pull_request:
@@ -17,6 +16,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           LANGUAGE: English
-          USE_GITHUB_MODELS: true
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           LOG_LEVEL: debug
           INCLUDE_PATTERNS: src/*,.github/**/*

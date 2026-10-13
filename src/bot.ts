@@ -4,7 +4,7 @@ import { minimatch } from 'minimatch'
 import { Chat } from './chat.js';
 import log from 'loglevel';
 
-const OPENAI_API_KEY = 'OPENAI_API_KEY';
+const GEMINI_API_KEY = 'GEMINI_API_KEY';
 const COMPARE_FILES_LIMIT = 300;
 const REVIEW_MARKER = '<!-- chatgpt-code-review -->';
 const MAX_PATCH_COUNT = process.env.MAX_PATCH_LENGTH
@@ -109,7 +109,7 @@ export const createReviewBody = (
 ) => {
   const heading =
     hasInlineComments || bodyComments.length
-      ? 'Code review by ChatGPT'
+      ? 'Code review by Gemini'
       : 'LGTM 👍';
   return [heading, ...bodyComments, REVIEW_MARKER].join('\n\n');
 };
@@ -160,7 +160,8 @@ export const getChangedFiles = async (context: PullRequestContext) => {
         (r) =>
           r.user?.type === 'Bot' &&
           r.body &&
-          (r.body.startsWith('Code review by ChatGPT') ||
+          (r.body.startsWith('Code review by Gemini') ||
+            r.body.startsWith('Code review by ChatGPT') ||
             r.body.startsWith('LGTM'))
       );
       if (hasLegacyReview) {
@@ -234,12 +235,8 @@ export const robot = (app: Probot) => {
   }
 
   const loadChat = async (context: Context) => {
-    if (process.env.USE_GITHUB_MODELS === 'true' && process.env.GITHUB_TOKEN) {
-      return new Chat(process.env.GITHUB_TOKEN);
-    }
-
-    if (process.env.OPENAI_API_KEY) {
-      return new Chat(process.env.OPENAI_API_KEY);
+    if (process.env.GEMINI_API_KEY) {
+      return new Chat(process.env.GEMINI_API_KEY);
     }
 
     const repo = context.repo();
@@ -250,7 +247,7 @@ export const robot = (app: Probot) => {
         {
           owner: repo.owner,
           repo: repo.repo,
-          name: OPENAI_API_KEY,
+          name: GEMINI_API_KEY,
         }
       )) as any;
 
@@ -264,7 +261,7 @@ export const robot = (app: Probot) => {
         repo: repo.repo,
         owner: repo.owner,
         issue_number: context.pullRequest().pull_number,
-        body: `Seems you are using me but didn't get OPENAI_API_KEY seted in Variables/Secrets for this repo. you could follow [readme](https://github.com/anc95/ChatGPT-CodeReview) for more information`,
+        body: `Seems you are using me but didn't get GEMINI_API_KEY set in Variables/Secrets for this repo. Create an API key in Google AI Studio, then follow [the readme](https://github.com/anc95/ChatGPT-CodeReview) for more information.`,
       });
       return null;
     }

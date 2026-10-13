@@ -1,6 +1,6 @@
 # CodeReview BOT
 
-> A code review robot powered by ChatGPT
+> Gemini API を利用したコードレビュー BOT
 
 Translation Versions: [ENGLISH](./README.md) | [简体中文](./README.zh-CN.md) | [繁體中文](./README.zh-TW.md) | [한국어](./README.ko.md) | [日本語](./README.ja.md)
 
@@ -17,7 +17,7 @@ Install: [apps/cr-gpt](https://github.com/apps/cr-gpt);
 1. リポジトリのホームページに移動します
 2. `settings` をクリックします
 3. `secrets and variables` メニューの下の `actions` をクリックします
-4. `New repository variable` をクリックして OpenAI の API キーの登録を行います。変数名は `OPENAI_API_KEY` にしてください。変数の値には OpenAI の API キーを入力します。 (OpenAI のホームページから API キーを取得できます。)
+4. ホスト版 BOT を利用する場合は、[Google AI Studio](https://aistudio.google.com/app/apikey) の API キーを `GEMINI_API_KEY` という名前のリポジトリ変数に登録します。GitHub Actions では同名のシークレットに登録してください。
    <img width="1465" alt="image" src="https://user-images.githubusercontent.com/13167934/218533628-3974b70f-c423-44b0-b096-d1ec2ace85ea.png">
 
 ### Start using
@@ -37,7 +37,7 @@ example:
 
 [actions/chatgpt-codereviewer](https://github.com/marketplace/actions/chatgpt-codereviewer)
 
-1. `OPENAI_API_KEY` を設定する
+1. GitHub Actions のシークレットに `GEMINI_API_KEY` を追加します。
 2. 以下の例のように `.github/workflows/cr.yml` を作成する
 
 ```yml
@@ -59,14 +59,13 @@ jobs:
       - uses: anc95/ChatGPT-CodeReview@main
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           # Optional
           LANGUAGE: Chinese
           MODEL:
           PROMPT:
           top_p: 1
           temperature: 1
-          # REASONING_EFFORT: low # optional; only for reasoning models (e.g. gpt-5.4, gpt-5.5), values (model support varies): none, minimal, low, medium, high, xhigh
           IGNORE_PATTERNS: /node_modules,*.md # Regex pattern to ignore files, separated by comma
 ```
 

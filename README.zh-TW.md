@@ -1,6 +1,6 @@
 # 程式碼審查機器人
 
-> 由 ChatGPT 提供支援的程式碼審查機器人
+> 使用 Gemini API 的程式碼審查機器人
 
 翻譯版本：[English](./README.md) | [簡體中文](./README.zh-CN.md) | [繁體中文](./README.zh-TW.md) | [한국어](./README.ko.md) | [日本語](./README.ja.md)
 
@@ -17,7 +17,7 @@
 1. 轉到你要整合此機器人的倉庫首頁
 2. 點選 `settings`
 3. 點選 `actions` 在下面的 `secrets and variables`
-4. 切換到 `Variables` 選項，建立一個新變數 `OPENAI_API_KEY`，值為你的 open api key (如果是 Github Action 整合，則設定在 secrets 中)
+4. 使用託管機器人時，請將從 [Google AI Studio](https://aistudio.google.com/app/apikey) 取得的 API 金鑰新增為名為 `GEMINI_API_KEY` 的儲存庫變數。使用 GitHub Actions 時，請將其新增為同名密碼。
    <img width="1465" alt="image" src="https://user-images.githubusercontent.com/13167934/218533628-3974b70f-c423-44b0-b096-d1ec2ace85ea.png">
 
 ### 開始使用
@@ -35,7 +35,7 @@
 
 [actions/chatgpt-codereviewer](https://github.com/marketplace/actions/chatgpt-codereviewer)
 
-1. 新增 `OPENAI_API_KEY` 到你的 github actions secrets
+1. 將 `GEMINI_API_KEY` 新增至 GitHub Actions secrets
 2. 建立 `.github/workflows/cr.yml` 新增以下內容
 
 ```yml
@@ -57,16 +57,14 @@ jobs:
       - uses: anc95/ChatGPT-CodeReview@main
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           # Optional
           LANGUAGE: Chinese
-          OPENAI_API_ENDPOINT: https://api.openai.com/v1
-          MODEL: gpt-3.5-turbo # https://platform.openai.com/docs/models
+          MODEL: gemini-2.5-flash # https://ai.google.dev/gemini-api/docs/models
           PROMPT: # example: Please check if there are any confusions or irregularities in the following code diff:
-          top_p: 1 # https://platform.openai.com/docs/api-reference/chat/create#chat/create-top_p
-          temperature: 1 # https://platform.openai.com/docs/api-reference/chat/create#chat/create-temperature
+          top_p: 1
+          temperature: 1
           max_tokens: 10000
-          # REASONING_EFFORT: low # optional; only for reasoning models (e.g. gpt-5.4, gpt-5.5), values (model support varies): none, minimal, low, medium, high, xhigh
           MAX_PATCH_LENGTH: 10000 # if the patch/diff length is large than MAX_PATCH_LENGTH, will be ignored and won't review. By default, with no MAX_PATCH_LENGTH set, there is also no limit for the patch/diff length.
           IGNORE_PATTERNS: /node_modules,*.md # Regex pattern to ignore files, separated by comma
 ```

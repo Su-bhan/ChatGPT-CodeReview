@@ -1,6 +1,6 @@
 # CodeReview BOT
 
-> cr bot은 ChatGPT를 활용한 코드리뷰 로봇입니다.
+> Gemini API를 사용하는 코드 리뷰 봇입니다.
 
 Translation Versions: [ENGLISH](./README.md) | [简体中文](./README.zh-CN.md) | [繁體中文](./README.zh-TW.md) | [한국어](./README.ko.md) | [日本語](./README.ja.md)
 
@@ -17,7 +17,7 @@ Translation Versions: [ENGLISH](./README.md) | [简体中文](./README.zh-CN.md)
 1. cr bot을 적용할 레포지토리 홈페이지로 이동합니다.
 2. `settings` 클릭
 3. `secrets and variables` 메뉴 밑의 `actions` 를 클릭
-4. `Variables` 탭으로 변경합니다, `New repository variable` 버튼을 눌러서 새로운 `OPENAI_API_KEY` 변수를 생성합니다. 변수의 값으로 당신의 open api key 를 입력합니다. (OpenAI 홈페이지에서 api 키를 받을 수 있습니다.)
+4. 호스팅된 봇에서는 [Google AI Studio](https://aistudio.google.com/app/apikey) API 키를 `GEMINI_API_KEY` 저장소 변수로 추가합니다. GitHub Actions에서는 같은 이름의 시크릿으로 추가합니다.
    <img width="1465" alt="image" src="https://user-images.githubusercontent.com/13167934/218533628-3974b70f-c423-44b0-b096-d1ec2ace85ea.png">
 
 ### 사용 시작하기
@@ -37,7 +37,7 @@ Translation Versions: [ENGLISH](./README.md) | [简体中文](./README.zh-CN.md)
 
 [actions/chatgpt-codereviewer](https://github.com/marketplace/actions/chatgpt-codereviewer)
 
-1. `OPENAI_API_KEY` 를 당신의 github actions secrets 에 추가합니다.
+1. GitHub Actions 시크릿에 `GEMINI_API_KEY`를 추가합니다.
 2. `.github/workflows/cr.yml` 를 생성하고, 아래의 내용을 추가합니다.
 
 ```yml
@@ -58,10 +58,9 @@ jobs:
       - uses: anc95/ChatGPT-CodeReview@main
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           # optional
           LANGUAGE: Korean
-          # REASONING_EFFORT: low # optional; only for reasoning models (e.g. gpt-5.4, gpt-5.5), values (model support varies): none, minimal, low, medium, high, xhigh
           PROMPT:
           IGNORE_PATTERNS: /node_modules,*.md # Regex pattern to ignore files, separated by comma
 ```

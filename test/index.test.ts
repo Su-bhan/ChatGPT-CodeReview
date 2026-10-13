@@ -53,7 +53,7 @@ const patch = [
 ].join('\n');
 
 const createBotReview = (
-  body = 'Code review by ChatGPT',
+  body = 'Code review by Gemini',
   commitId: string | null = 'reviewed-head'
 ) => ({
   body: `${body}\n\n<!-- chatgpt-code-review -->`,
@@ -488,15 +488,15 @@ describe('createInlineReviewComment', () => {
 });
 
 describe('createReviewBody', () => {
-  test('marks a review with inline comments as a ChatGPT review', () => {
+  test('marks a review with inline comments as a Gemini review', () => {
     expect(createReviewBody(true, [])).toBe(
-      'Code review by ChatGPT\n\n<!-- chatgpt-code-review -->'
+      'Code review by Gemini\n\n<!-- chatgpt-code-review -->'
     );
   });
 
   test('keeps unpositioned findings in the review body', () => {
     expect(createReviewBody(false, ['**File:** `src/file.ts`\n\nFinding'])).toBe(
-      'Code review by ChatGPT\n\n**File:** `src/file.ts`\n\nFinding\n\n<!-- chatgpt-code-review -->'
+      'Code review by Gemini\n\n**File:** `src/file.ts`\n\nFinding\n\n<!-- chatgpt-code-review -->'
     );
   });
 

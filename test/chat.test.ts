@@ -1,252 +1,157 @@
-import { Chat } from "../src/chat";
+import { Chat } from '../src/chat';
 
-jest.mock("openai", () => {
-  const mockCreate = jest.fn();
-  return {
-    OpenAI: jest.fn().mockImplementation(() => ({
-      chat: { completions: { create: mockCreate } },
-    })),
-    mockCreate,
-  };
-});
+type FetchMock = (
+  url: string,
+  options: {
+    method: string;
+    headers: Record<string, string>;
+    body: string;
+  }
+) => Promise<{
+  ok: boolean;
+  status?: number;
+  json?(): Promise<unknown>;
+  text?(): Promise<string>;
+}>;
 
-const { OpenAI, mockCreate } = require("openai");
+const fetchMock = jest.fn<ReturnType<FetchMock>, Parameters<FetchMock>>();
+const runtimeGlobal = globalThis as typeof globalThis & { fetch: FetchMock };
+const originalFetch = runtimeGlobal.fetch;
 
-describe("Chat", () => {
+describe('Chat', () => {
   const originalEnv = process.env;
 
   beforeEach(() => {
     process.env = { ...originalEnv };
-    mockCreate.mockReset();
-    mockCreate.mockResolvedValue({
-      choices: [{ message: { content: '{"lgtm": true, "review_comment": ""}' } }],
+    runtimeGlobal.fetch = fetchMock;
+    fetchMock.mockReset();
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        candidates: [
+          {
+            content: {
+              parts: [{ text: '{"lgtm": true, "review_comment": ""}' }],
+            },
+          },
+        ],
+      }),
     });
-    (OpenAI as jest.Mock).mockClear();
   });
 
   afterEach(() => {
     process.env = originalEnv;
+    runtimeGlobal.fetch = originalFetch;
   });
 
-  test("passes model from MODEL env var", async () => {
-    process.env.MODEL = "gpt-5.4";
-
-    const chat = new Chat("test-key");
-    await chat.codeReview("@@ -1,3 +1,4 @@\n+new line\n old line");
-
-    expect(mockCreate).toHaveBeenCalledWith(
-      expect.objectContaining({ model: "gpt-5.4" })
-    );
-  });
-
-  test("defaults to gpt-4o-mini when MODEL is not set", async () => {
+  test('uses Gemini API with the default model and API key', async () => {
     delete process.env.MODEL;
 
-    const chat = new Chat("test-key");
-    await chat.codeReview("@@ -1,3 +1,4 @@\n+new line\n old line");
+    const chat = new Chat('test-key');
+    await chat.codeReview('@@ -1,3 +1,4 @@\n+new line\n old line');
 
-    expect(mockCreate).toHaveBeenCalledWith(
-      expect.objectContaining({ model: "gpt-4o-mini" })
-    );
-  });
-
-  test("passes reasoning_effort when REASONING_EFFORT is set", async () => {
-    process.env.MODEL = "o3-mini";
-    process.env.REASONING_EFFORT = "low";
-
-    const chat = new Chat("test-key");
-    await chat.codeReview("@@ -1,3 +1,4 @@\n+new line\n old line");
-
-    expect(mockCreate).toHaveBeenCalledWith(
-      expect.objectContaining({ reasoning_effort: "low" })
-    );
-  });
-
-  test("passes reasoning_effort for the o1 reasoning model", async () => {
-    process.env.MODEL = "o1";
-    process.env.REASONING_EFFORT = "medium";
-
-    const chat = new Chat("test-key");
-    await chat.codeReview("@@ -1,3 +1,4 @@\n+new line\n old line");
-
-    expect(mockCreate).toHaveBeenCalledWith(
-      expect.objectContaining({ reasoning_effort: "medium" })
-    );
-  });
-
-  test("passes reasoning_effort for the o1-mini reasoning model", async () => {
-    process.env.MODEL = "o1-mini";
-    process.env.REASONING_EFFORT = "medium";
-
-    const chat = new Chat("test-key");
-    await chat.codeReview("@@ -1,3 +1,4 @@\n+new line\n old line");
-
-    expect(mockCreate).toHaveBeenCalledWith(
-      expect.objectContaining({ reasoning_effort: "medium" })
-    );
-  });
-
-  test("passes reasoning_effort for provider-prefixed reasoning models", async () => {
-    process.env.USE_GITHUB_MODELS = "true";
-    process.env.MODEL = "openai/o3-mini";
-    process.env.REASONING_EFFORT = "medium";
-
-    const chat = new Chat("test-key");
-    await chat.codeReview("@@ -1,3 +1,4 @@\n+new line\n old line");
-
-    expect(mockCreate).toHaveBeenCalledWith(
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
       expect.objectContaining({
-        model: "openai/o3-mini",
-        reasoning_effort: "medium",
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': 'test-key',
+        },
       })
     );
   });
 
-  test("detects provider-prefixed reasoning models case-insensitively", async () => {
-    process.env.USE_GITHUB_MODELS = "true";
-    process.env.MODEL = "OpenAI/O3-MINI";
-    process.env.REASONING_EFFORT = "high";
+  test('passes model and generation settings to Gemini', async () => {
+    process.env.MODEL = 'gemini-2.5-pro';
+    process.env.temperature = '0.5';
+    process.env.top_p = '0.9';
+    process.env.max_tokens = '2048';
 
-    const chat = new Chat("test-key");
-    await chat.codeReview("@@ -1,3 +1,4 @@\n+new line\n old line");
+    const chat = new Chat('test-key');
+    await chat.codeReview('@@ -1,3 +1,4 @@\n+new line\n old line');
 
-    expect(mockCreate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        model: "OpenAI/O3-MINI",
-        reasoning_effort: "high",
-      })
-    );
+    const request = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(fetchMock.mock.calls[0][0]).toContain('/gemini-2.5-pro:generateContent');
+    expect(request.generationConfig).toEqual({
+      responseMimeType: 'application/json',
+      temperature: 0.5,
+      topP: 0.9,
+      maxOutputTokens: 2048,
+    });
+    expect(request.contents[0].role).toBe('user');
+    expect(request.contents[0].parts[0].text).toContain('new line');
   });
 
-  test.each(["none", "minimal", "xhigh"])(
-    "passes SDK-supported reasoning_effort value %s",
-    async (reasoningEffort) => {
-      process.env.MODEL = "gpt-5.5";
-      process.env.REASONING_EFFORT = reasoningEffort;
+  test('returns review arrays from Gemini JSON responses', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        candidates: [
+          {
+            content: {
+              parts: [
+                {
+                  text: '{"reviews":[{"lgtm":false,"review_comment":"Found a bug"}]}',
+                },
+              ],
+            },
+          },
+        ],
+      }),
+    });
 
-      const chat = new Chat("test-key");
-      await chat.codeReview("@@ -1,3 +1,4 @@\n+new line\n old line");
+    const chat = new Chat('test-key');
+    const result = await chat.codeReview('@@ -1,3 +1,4 @@\n+new line\n old line');
 
-      expect(mockCreate).toHaveBeenCalledWith(
-        expect.objectContaining({ reasoning_effort: reasoningEffort })
-      );
-    }
-  );
-
-  test("does not pass reasoning_effort when REASONING_EFFORT is not set", async () => {
-    process.env.MODEL = "gpt-4o";
-    delete process.env.REASONING_EFFORT;
-
-    const chat = new Chat("test-key");
-    await chat.codeReview("@@ -1,3 +1,4 @@\n+new line\n old line");
-
-    const callArgs = mockCreate.mock.calls[0][0];
-    expect(callArgs.reasoning_effort).toBeUndefined();
+    expect(result).toEqual([
+      { lgtm: false, review_comment: 'Found a bug' },
+    ]);
   });
 
-  test("does not pass reasoning_effort when model is not a reasoning model", async () => {
-    process.env.MODEL = "gpt-4o";
-    process.env.REASONING_EFFORT = "high";
+  test('returns a text response as a review when it is not valid JSON', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        candidates: [
+          {
+            content: {
+              parts: [{ text: 'Please fix this issue.' }],
+            },
+          },
+        ],
+      }),
+    });
 
-    const chat = new Chat("test-key");
-    await chat.codeReview("@@ -1,3 +1,4 @@\n+new line\n old line");
+    const chat = new Chat('test-key');
+    const result = await chat.codeReview('@@ -1,3 +1,4 @@\n+new line\n old line');
 
-    const callArgs = mockCreate.mock.calls[0][0];
-    expect(callArgs.reasoning_effort).toBeUndefined();
+    expect(result).toEqual({
+      lgtm: false,
+      hunk_header: '@@ -1,3 +1,4 @@',
+      review_comment: 'Please fix this issue.',
+    });
   });
 
-  test("does not treat every o-prefixed model as a reasoning model", async () => {
-    process.env.MODEL = "orca-2";
-    process.env.REASONING_EFFORT = "high";
-    process.env.temperature = "0.5";
-    process.env.top_p = "0.9";
+  test('throws an explicit error when Gemini rejects the request', async () => {
+    fetchMock.mockResolvedValue({
+      ok: false,
+      status: 400,
+      text: async () => 'Invalid API key',
+    });
 
-    const chat = new Chat("test-key");
-    await chat.codeReview("@@ -1,3 +1,4 @@\n+new line\n old line");
+    const chat = new Chat('test-key');
 
-    const callArgs = mockCreate.mock.calls[0][0];
-    expect(callArgs.reasoning_effort).toBeUndefined();
-    expect(callArgs.temperature).toBe(0.5);
-    expect(callArgs.top_p).toBe(0.9);
-    expect(callArgs.response_format).toEqual({ type: "json_object" });
+    await expect(
+      chat.codeReview('@@ -1,3 +1,4 @@\n+new line\n old line')
+    ).rejects.toThrow('Gemini API request failed (400): Invalid API key');
   });
 
-  test.each(["o1-preview"])(
-    "does not pass reasoning_effort for %s",
-    async (model) => {
-      process.env.MODEL = model;
-      process.env.REASONING_EFFORT = "high";
-      process.env.temperature = "0.5";
-      process.env.top_p = "0.9";
+  test('returns an empty review without calling Gemini for an empty patch', async () => {
+    const chat = new Chat('test-key');
+    const result = await chat.codeReview('');
 
-      const chat = new Chat("test-key");
-      await chat.codeReview("@@ -1,3 +1,4 @@\n+new line\n old line");
-
-      const callArgs = mockCreate.mock.calls[0][0];
-      expect(callArgs.reasoning_effort).toBeUndefined();
-      expect(callArgs.temperature).toBe(0.5);
-      expect(callArgs.top_p).toBe(0.9);
-      expect(callArgs.response_format).toEqual({ type: "json_object" });
-    }
-  );
-
-  test("omits temperature and top_p for reasoning models", async () => {
-    process.env.MODEL = "gpt-5.4";
-    process.env.temperature = "0.5";
-    process.env.top_p = "0.9";
-
-    const chat = new Chat("test-key");
-    await chat.codeReview("@@ -1,3 +1,4 @@\n+new line\n old line");
-
-    const callArgs = mockCreate.mock.calls[0][0];
-    expect(callArgs.temperature).toBeUndefined();
-    expect(callArgs.top_p).toBeUndefined();
-    expect(callArgs.response_format).toEqual({ type: "json_object" });
-  });
-
-  test("includes temperature, top_p, and response_format for non-reasoning models", async () => {
-    process.env.MODEL = "gpt-4o";
-    process.env.temperature = "0.5";
-    process.env.top_p = "0.9";
-
-    const chat = new Chat("test-key");
-    await chat.codeReview("@@ -1,3 +1,4 @@\n+new line\n old line");
-
-    const callArgs = mockCreate.mock.calls[0][0];
-    expect(callArgs.temperature).toBe(0.5);
-    expect(callArgs.top_p).toBe(0.9);
-    expect(callArgs.response_format).toEqual({ type: "json_object" });
-  });
-
-  test("returns empty review for empty patch", async () => {
-    const chat = new Chat("test-key");
-    const result = await chat.codeReview("");
-    expect(result).toEqual({ lgtm: true, review_comment: "" });
-    expect(mockCreate).not.toHaveBeenCalled();
-  });
-
-  test("uses GitHub Models endpoint when USE_GITHUB_MODELS is true", async () => {
-    process.env.USE_GITHUB_MODELS = "true";
-    process.env.MODEL = "openai/gpt-4o";
-
-    new Chat("test-key");
-
-    expect(OpenAI).toHaveBeenCalledWith(
-      expect.objectContaining({
-        baseURL: "https://models.github.ai/inference",
-      })
-    );
-  });
-
-  test("uses custom endpoint when OPENAI_API_ENDPOINT is set", async () => {
-    process.env.OPENAI_API_ENDPOINT = "https://custom.api.com/v1";
-
-    new Chat("test-key");
-
-    expect(OpenAI).toHaveBeenCalledWith(
-      expect.objectContaining({
-        baseURL: "https://custom.api.com/v1",
-      })
-    );
+    expect(result).toEqual({ lgtm: true, review_comment: '' });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

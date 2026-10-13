@@ -1,6 +1,6 @@
 # 代码审查机器人
 
-> 由 ChatGPT 提供支持的代码审查机器人
+> 使用 Gemini API 的代码审查机器人
 
 > 想在 Gitlab 使用？
 > 试试 https://github.com/nangongchengfeng/Chat-CodeReview.git
@@ -20,7 +20,7 @@
 1.  转到你要集成此机器人的仓库首页
 2.  点击`settings`
 3.  点击`actions`在下面`secrets and variables`
-4.  切换到`Variables`选项，创建一个新变量`OPENAI_API_KEY`，值为你的 open api 的 key<img width="1465" alt="image" src="https://user-images.githubusercontent.com/13167934/218533628-3974b70f-c423-44b0-b096-d1ec2ace85ea.png">
+4. 使用托管机器人时，请将从[Google AI Studio](https://aistudio.google.com/app/apikey)获取的 API 密钥添加为名为`GEMINI_API_KEY`的仓库变量。使用 GitHub Actions 时，请将其添加为同名密钥。
 
 ### 开始使用
 
@@ -39,7 +39,7 @@
 
 [actions/chatgpt-codereviewer](https://github.com/marketplace/actions/chatgpt-codereviewer)
 
-1.  添加`OPENAI_API_KEY`到你的 github action 密钥
+1.  将`GEMINI_API_KEY`添加到你的 GitHub Actions 密钥
 2.  创建`.github/workflows/cr.yml`添加以下内容
 
 ```yml
@@ -60,10 +60,9 @@ jobs:
       - uses: anc95/ChatGPT-CodeReview@main
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           # optional
           LANGUAGE: Chinese
-          # REASONING_EFFORT: low # optional; only for reasoning models (e.g. gpt-5.4, gpt-5.5), values (model support varies): none, minimal, low, medium, high, xhigh
           PROMPT:
           IGNORE_PATTERNS: /node_modules,*.md # Regex pattern to ignore files, separated by comma
 ```
