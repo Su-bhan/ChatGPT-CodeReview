@@ -126,6 +126,44 @@ describe('Kawnix pull-request review service', () => {
     );
   });
 
+  test('does not publish a duplicate review when the marker already exists', async () => {
+    const existingReviews: Array<{ body?: string; htmlUrl?: string }> = [];
+    const github = {
+      listPullRequestFiles: jest.fn(async () => [
+        { filename: 'src/example.ts', status: 'modified', patch },
+      ]),
+      listPullRequestReviews: jest.fn(async () => existingReviews),
+      createPullRequestReview: jest.fn(async ({ body }: { body: string }) => {
+        existingReviews.push({
+          body,
+          htmlUrl: 'https://github.com/owner/repo/pull/7#existing',
+        });
+        return { htmlUrl: existingReviews[0].htmlUrl };
+      }),
+    };
+    const chat = {
+      codeReview: jest.fn(async () => ({
+        lgtm: false,
+        hunk_header: '@@ -1,1 +1,2 @@',
+        review_comment: 'Fix this.',
+      })),
+    };
+
+    const first = await reviewPullRequest({
+      input: { ...input, publishing_mode: 'pull_request_review' },
+      github,
+      chat,
+    });
+    const second = await reviewPullRequest({
+      input: { ...input, publishing_mode: 'pull_request_review' },
+      github,
+      chat,
+    });
+    expect(first.publication.published).toBe(true);
+    expect(second.publication).toEqual(first.publication);
+    expect(github.createPullRequestReview).toHaveBeenCalledTimes(1);
+  });
+
   test('rejects pull requests with too many files', async () => {
     const github = {
       listPullRequestFiles: jest.fn(async () =>

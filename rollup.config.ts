@@ -63,4 +63,12 @@ export default defineConfig([
     },
     plugins: [esbuild()],
   },
+  {
+    input: ['src/kawnix-preflight.ts'],
+    output: {
+      file: 'dist/kawnix-preflight.js',
+      format: 'esm',
+    },
+    plugins: [esbuild()],
+  },
 ]);

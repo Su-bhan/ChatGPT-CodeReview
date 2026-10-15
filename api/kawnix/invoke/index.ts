@@ -4,6 +4,11 @@ import {
   InMemoryKawnixJobStore,
 } from '../../../src/kawnix-jobs.js';
 import { PostgresKawnixJobStore } from '../../../src/postgres-kawnix-jobs.js';
+import {
+  createKawnixRepositoryAuthorizer,
+  parseKawnixRepositoryAccess,
+} from '../../../src/kawnix-authorization.js';
+import { getKawnixConfigStatus } from '../../../src/kawnix-config.js';
 
 export const config = {
   runtime: 'nodejs18.x',
@@ -12,17 +17,21 @@ export const config = {
 const jobStore = process.env.DATABASE_URL
   ? new PostgresKawnixJobStore(process.env.DATABASE_URL)
   : new InMemoryKawnixJobStore();
+const repositoryAccess = createKawnixRepositoryAuthorizer(
+  parseKawnixRepositoryAccess(process.env.KAWNIX_REPOSITORY_ACCESS)
+);
 
 export default async function handler(request: Request) {
   const bearerToken = process.env.KAWNIX_PROVIDER_TOKEN ?? '';
   const appId = process.env.APP_ID ?? '';
   const privateKey = process.env.PRIVATE_KEY ?? '';
   const geminiApiKey = process.env.GEMINI_API_KEY ?? '';
-  const isConfigured = Boolean(
-    appId && privateKey && geminiApiKey && process.env.DATABASE_URL
-  );
+  const configStatus = getKawnixConfigStatus();
+  const isConfigured = configStatus.productionReady;
   const hasExecutionConfig = Boolean(appId && privateKey && geminiApiKey);
-  const handlers = createInMemoryKawnixJobHandlers(jobStore);
+  const handlers = createInMemoryKawnixJobHandlers(jobStore, {
+    authorizeRepository: repositoryAccess,
+  });
 
   return handleKawnixProviderRequest(request, {
     bearerToken,
@@ -35,6 +44,10 @@ export default async function handler(request: Request) {
           review_pull_request: hasExecutionConfig,
           publish_review: hasExecutionConfig,
           streaming: false,
+        },
+        configuration: {
+          production_ready: configStatus.productionReady,
+          missing: configStatus.missing,
         },
         message:
           isConfigured

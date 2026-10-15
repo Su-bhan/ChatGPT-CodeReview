@@ -87,6 +87,20 @@ pm2 start pm2.config.cjs
 
 [probot](https://probot.github.io/docs/development/) for more detail
 
+## Kawnix provider
+
+This repository also contains a separate Kawnix provider path. It does not
+replace the existing GitHub webhook or GitHub Action workflows.
+
+The provider exposes:
+
+- `POST /api/kawnix/invoke` for Kawnix health, review-job creation, and status.
+- `POST /api/kawnix/worker` for scheduled background execution.
+- `POST /api/kawnix/maintenance` for scheduled retention cleanup.
+
+Use [KAWNIX_DEPLOYMENT.md](./KAWNIX_DEPLOYMENT.md) for deployment, secret,
+scheduler, GitHub App, and Kawnix registration instructions.
+
 ## Dev
 
 ### Setup

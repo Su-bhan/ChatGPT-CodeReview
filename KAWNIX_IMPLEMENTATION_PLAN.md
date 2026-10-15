@@ -587,6 +587,51 @@ minutes are marked `expired`; terminal jobs older than seven days are deleted.
 The endpoint is intended for a scheduled maintenance trigger and uses the
 worker token.
 
+Publication mode now embeds a deterministic review marker in the GitHub review
+body and checks existing pull-request reviews for that marker before creating
+another review. This protects retries and worker restarts from normal duplicate
+publication. The deployment should still keep one active worker per owner and
+use the PostgreSQL claim lock to minimize concurrent publication races.
+
+Repository authorization is now enforced with `KAWNIX_REPOSITORY_ACCESS`, a
+provider-side JSON mapping from the hashed bearer owner ID to allowed
+`owner/name` repositories. Authorization is checked when a job is created and
+again when a worker claims it. An empty mapping denies review jobs until an
+explicit consumer-to-repository grant is configured.
+
+An end-to-end contract test now covers authenticated start, authorization,
+queued-job claiming, review execution, durable result storage, status polling,
+and unauthorized repository rejection using the in-memory store and mocked
+GitHub/Gemini dependencies. Real PostgreSQL, GitHub App, Gemini, and Kawnix
+environment tests remain deployment validation tasks.
+
+The PostgreSQL store now has an opt-in integration suite. It runs when
+`DATABASE_URL` is configured and exercises schema initialization, persistence,
+atomic claiming, updates, idempotency isolation, and cleanup. It is skipped
+without a configured database so local unit-test runs do not require external
+infrastructure.
+
+The GitHub integration test now composes the review service with the real
+GitHub App adapter and mocked GitHub HTTP responses. It verifies installation
+token reuse, changed-file retrieval, existing review lookup, review creation,
+and duplicate-publication prevention. A live GitHub App and dedicated test
+repository are still required before production publication mode is enabled.
+
+Deployment preflight is now represented by a shared configuration diagnostic.
+The health response reports production readiness and missing configuration
+names without returning secret values. The worker refuses execution when
+repository access grants are not configured.
+
+The deployment runbook is documented in
+[KAWNIX_DEPLOYMENT.md](./KAWNIX_DEPLOYMENT.md). It defines the three runtime
+routes, required secrets, Node.js runtime requirement, scheduler calls, health
+verification, controlled rollout, and incident response procedure.
+
+The definitive registration template is documented in
+[KAWNIX_MANIFEST.example.json](./KAWNIX_MANIFEST.example.json). It describes
+the live bearer-authenticated `health`, `start`, and `status` contract and
+explicitly excludes the legacy HMAC prototype from production registration.
+
 ### Idempotency tasks
 
 1. Read `Idempotency-Key`.

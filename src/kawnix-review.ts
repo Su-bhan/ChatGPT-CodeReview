@@ -1,4 +1,5 @@
 import { minimatch } from 'minimatch';
+import { createHash } from 'node:crypto';
 
 import {
   createInlineReviewComment,
@@ -52,6 +53,11 @@ export type KawnixGitHubClient = {
       side: 'LEFT' | 'RIGHT';
     }>;
   }) => Promise<{ htmlUrl?: string }>;
+  listPullRequestReviews?: (
+    owner: string,
+    repository: string,
+    pullRequestNumber: number
+  ) => Promise<Array<{ body?: string; htmlUrl?: string }>>;
 };
 
 type ReviewResponse = {
@@ -122,6 +128,20 @@ const shouldReviewFile = (
 
 const asReviews = (value: ReviewResponse | ReviewResponse[]) =>
   Array.isArray(value) ? value : [value];
+
+const getPublicationMarker = (input: KawnixStartInput) =>
+  `<!-- kawnix-review:${createHash('sha256')
+    .update(
+      JSON.stringify({
+        repository: input.repository,
+        pull_request_number: input.pull_request_number,
+        commit_sha: input.commit_sha,
+        prompt: input.prompt,
+        include_patterns: input.include_patterns,
+        ignore_patterns: input.ignore_patterns,
+      })
+    )
+    .digest('hex')} -->`;
 
 export const reviewPullRequest = async ({
   input,
@@ -240,15 +260,31 @@ export const reviewPullRequest = async ({
   }
 
   if (publication.mode === 'pull_request_review') {
+    const marker = getPublicationMarker(input);
+    if (github.listPullRequestReviews) {
+      const existingReviews = await github.listPullRequestReviews(
+        input.repository.owner,
+        input.repository.name,
+        input.pull_request_number
+      );
+      const existingReview = existingReviews.find((review) =>
+        review.body?.includes(marker)
+      );
+      if (existingReview) {
+        publication.published = true;
+        publication.url = existingReview.htmlUrl;
+        return result;
+      }
+    }
     const review = await github.createPullRequestReview({
       owner: input.repository.owner,
       repository: input.repository.name,
       pullRequestNumber: input.pull_request_number,
       commitSha: input.commit_sha,
-      body: createReviewBody(
+      body: `${createReviewBody(
         findings.some((finding) => finding.line !== undefined),
         bodyComments
-      ),
+      )}\n\n${marker}`,
       comments: findings
         .filter(
           (

@@ -1,0 +1,103 @@
+{
+  "metadata": {
+    "name": "ChatGPT Code Review",
+    "version": "2.0.0",
+    "description": "Review an authorized GitHub pull request with Gemini and return structured findings.",
+    "publisher": "ChatGPT-CodeReview"
+  },
+  "endpoint": {
+    "method": "POST",
+    "url": "https://<provider-domain>/api/kawnix/invoke",
+    "content_type": "application/json",
+    "authentication": {
+      "type": "bearer",
+      "credential_reference": "<kawnix-secret-reference>"
+    },
+    "timeout_ms": 30000
+  },
+  "execution": {
+    "mode": "asynchronous",
+    "streaming": false,
+    "start_status_code": 202,
+    "poll_operation": "status"
+  },
+  "operations": {
+    "health": {
+      "request": {
+        "operation": "health"
+      },
+      "success_status_codes": [200]
+    },
+    "start": {
+      "request": {
+        "operation": "start",
+        "repository": {
+          "owner": "<github-owner>",
+          "name": "<github-repository>"
+        },
+        "pull_request_number": 123,
+        "publishing_mode": "report_only",
+        "idempotency_key": "<unique-request-key>"
+      },
+      "success_status_codes": [202]
+    },
+    "status": {
+      "request": {
+        "operation": "status",
+        "job_id": "<job-id>"
+      },
+      "success_status_codes": [200]
+    }
+  },
+  "publishing_modes": [
+    {
+      "value": "report_only",
+      "default": true,
+      "description": "Return findings without writing to GitHub."
+    },
+    {
+      "value": "pull_request_review",
+      "default": false,
+      "description": "Publish a GitHub pull-request review when the provider App has write permission."
+    }
+  ],
+  "limits": {
+    "max_request_bytes": 65536,
+    "max_files": 100,
+    "max_patch_bytes_per_file": 200000,
+    "max_total_patch_bytes": 1000000,
+    "max_findings": 100,
+    "max_result_bytes": 256000,
+    "max_concurrent_reviews_per_consumer": 1,
+    "max_concurrent_reviews": 5
+  },
+  "repository_access": {
+    "model": "provider_allowlist",
+    "description": "The provider reviews only repositories explicitly granted to the authenticated consumer and available to its GitHub App installation."
+  },
+  "errors": {
+    "format": {
+      "success": false,
+      "error": {
+        "code": "<stable-error-code>",
+        "message": "<safe-human-readable-message>",
+        "retryable": false
+      }
+    },
+    "common_codes": [
+      "unauthorized",
+      "invalid_request",
+      "repository_not_authorized",
+      "job_not_found",
+      "review_failed",
+      "review_timeout",
+      "provider_unavailable"
+    ]
+  },
+  "notes": [
+    "Replace <provider-domain> and all angle-bracket placeholders before registration.",
+    "Register only the invoke URL. Worker and maintenance routes are provider-internal scheduler endpoints.",
+    "The bearer credential is provisioned by Kawnix and is never sent as a review input field.",
+    "The legacy HMAC prototype is not the production provider contract."
+  ]
+}

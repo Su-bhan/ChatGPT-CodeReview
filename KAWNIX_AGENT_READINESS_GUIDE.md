@@ -451,6 +451,16 @@ The manifest should tell Kawnix:
 
 The manifest must use the real production URL, not a placeholder.
 
+A complete registration template is available in
+[KAWNIX_MANIFEST.example.json](./KAWNIX_MANIFEST.example.json). Replace every
+angle-bracket placeholder before submitting it to Kawnix. Register only the
+invoke URL; the worker and maintenance routes are internal scheduler routes.
+
+The production contract uses bearer authentication and the `health`, `start`,
+and `status` operations. The older HMAC implementation in `src/kawnix.ts` is
+retained for compatibility with its existing tests and is not the production
+provider contract.
+
 ## 15. What must be deployed?
 
 The provider must be deployed at a public HTTPS address that Kawnix can reach.

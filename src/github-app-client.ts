@@ -212,5 +212,20 @@ export const createGitHubAppClient = (
       const result = (await response.json()) as { html_url?: string };
       return { htmlUrl: result.html_url };
     },
+    listPullRequestReviews: async (owner, repository, pullRequestNumber) => {
+      const response = await repositoryRequest(
+        owner,
+        repository,
+        `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repository)}/pulls/${pullRequestNumber}/reviews?per_page=100`
+      );
+      const reviews = (await response.json()) as Array<{
+        body?: string;
+        html_url?: string;
+      }>;
+      return reviews.map((review) => ({
+        body: review.body,
+        htmlUrl: review.html_url,
+      }));
+    },
   };
 };

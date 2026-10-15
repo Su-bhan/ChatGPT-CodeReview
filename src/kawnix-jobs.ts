@@ -10,6 +10,7 @@ import {
   type KawnixGitHubClient,
 } from './kawnix-review.js';
 import type { Chat } from './chat.js';
+import type { KawnixRepositoryAuthorizer } from './kawnix-authorization.js';
 
 export const KAWNIX_CONCURRENCY_LIMITS = {
   maxConcurrentPerOwner: 1,
@@ -218,10 +219,23 @@ const summarizeJob = (job: KawnixJob): Record<string, unknown> => ({
 });
 
 export const createInMemoryKawnixJobHandlers = (
-  store: KawnixJobStore
+  store: KawnixJobStore,
+  options: {
+    authorizeRepository?: KawnixRepositoryAuthorizer;
+  } = {}
 ): KawnixProviderHandlers => ({
   start: async (input, request) => {
     const ownerId = getProviderOwnerId(request);
+    if (
+      options.authorizeRepository &&
+      !(await options.authorizeRepository(ownerId, input.repository))
+    ) {
+      throw new KawnixJobError(
+        403,
+        'repository_not_authorized',
+        'The selected repository is not authorized for this consumer.'
+      );
+    }
     const idempotencyKey = input.idempotency_key;
     const requestHash = hashInput(input);
 
@@ -370,6 +384,7 @@ export const processNextKawnixJob = async (
   options: {
     maxAttempts?: number;
     timeoutMs?: number;
+    authorizeRepository?: KawnixRepositoryAuthorizer;
   } = {}
 ) => {
   const job = await store.claimNextQueued();
@@ -378,6 +393,16 @@ export const processNextKawnixJob = async (
   }
 
   try {
+    if (
+      options.authorizeRepository &&
+      !(await options.authorizeRepository(job.ownerId, getJobInput(job).repository))
+    ) {
+      throw new KawnixJobError(
+        403,
+        'repository_not_authorized',
+        'The selected repository is not authorized for this consumer.'
+      );
+    }
     const result = await withTimeout(
       execute(getJobInput(job)),
       options.timeoutMs ?? DEFAULT_TIMEOUT_MS

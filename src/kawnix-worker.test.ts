@@ -4,6 +4,7 @@ import {
   processNextKawnixJob,
   type KawnixJob,
 } from './kawnix-jobs';
+import { createInMemoryKawnixJobHandlers } from './kawnix-jobs';
 
 const job: KawnixJob = {
   id: 'job_worker',
@@ -175,5 +176,29 @@ describe('Kawnix worker boundary', () => {
         failure: { code: 'job_expired' },
       });
       await expect(store.get('job_old_completed')).resolves.toBeUndefined();
+  });
+
+  test('rejects a start request for an unauthorized repository', async () => {
+    const store = new InMemoryKawnixJobStore();
+    const handlers = createInMemoryKawnixJobHandlers(store, {
+      authorizeRepository: async () => false,
+    });
+    const request = new Request('https://provider.example/invoke', {
+      headers: { Authorization: 'Bearer consumer-token' },
+    });
+
+    await expect(
+      handlers.start!(
+        {
+          operation: 'start',
+          repository: { owner: 'owner', name: 'repo' },
+          pull_request_number: 1,
+        },
+        request
+      )
+    ).rejects.toMatchObject({
+      status: 403,
+      code: 'repository_not_authorized',
+    });
   });
 });
