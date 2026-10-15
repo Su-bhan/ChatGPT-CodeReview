@@ -104,6 +104,12 @@ scheduler, GitHub App, and Kawnix registration instructions.
 For a complete plain-language explanation of the implementation and remaining
 release steps, read [KAWNIX_COMPLETE_GUIDE.md](./KAWNIX_COMPLETE_GUIDE.md).
 
+The Kawnix job store uses PostgreSQL through the `pg` package. Supabase works
+without an additional SDK: create a Supabase project, copy its PostgreSQL
+Session Pooler connection string from **Connect**, append
+`?sslmode=require` if it is not already present, and set it as `DATABASE_URL`.
+The provider creates its `kawnix_review_jobs` table automatically.
+
 ## Dev
 
 ### Setup

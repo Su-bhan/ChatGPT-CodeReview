@@ -70,7 +70,14 @@ export class PostgresKawnixJobStore implements KawnixJobStore {
 
   constructor(config: PoolConfig | string) {
     this.pool = new Pool(
-      typeof config === 'string' ? { connectionString: config } : config
+      typeof config === 'string'
+        ? {
+            connectionString: config,
+            connectionTimeoutMillis: 10_000,
+            idleTimeoutMillis: 30_000,
+            max: 5,
+          }
+        : config
     );
   }
 

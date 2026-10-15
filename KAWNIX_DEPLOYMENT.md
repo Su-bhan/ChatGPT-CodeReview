@@ -26,7 +26,7 @@ Configure these in the hosting platform's secret manager:
 - `APP_ID`: provider-owned GitHub App ID.
 - `PRIVATE_KEY`: provider-owned GitHub App private key.
 - `GEMINI_API_KEY`: Gemini API credential.
-- `DATABASE_URL`: PostgreSQL connection string.
+- `DATABASE_URL`: Supabase PostgreSQL connection string.
 
 Configure `KAWNIX_REPOSITORY_ACCESS` as a non-secret or protected secret
 depending on the platform:
@@ -44,6 +44,27 @@ The GitHub App should have:
 - Contents: read.
 - Pull requests: read.
 - Pull requests: write only when publication mode is enabled.
+
+### Supabase database setup
+
+The Kawnix provider uses PostgreSQL directly through the `pg` package; it does
+not require the Supabase JavaScript SDK. Create a Supabase project, open
+**Connect**, and copy a PostgreSQL connection string.
+
+For a hosted Node.js or serverless deployment, prefer the **Session pooler**
+connection string. Use the **Direct** connection only when the runtime has IPv6
+connectivity. Set the copied value as `DATABASE_URL` and keep
+`sslmode=require` in the query string:
+
+```env
+DATABASE_URL=postgresql://postgres.<project-ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres?sslmode=require
+```
+
+The application creates the `kawnix_review_jobs` table and its indexes
+automatically on the first database operation. No separate migration is
+required. The Supabase database password is part of the connection string, so
+store `DATABASE_URL` only in the local `.env` file or the hosting platform's
+secret manager.
 
 ## Build and deploy
 
