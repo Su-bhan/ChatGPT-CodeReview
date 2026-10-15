@@ -7,8 +7,8 @@ export const KAWNIX_MAX_BODY_BYTES = 64 * 1024;
 export const KAWNIX_PROVIDER_MANIFEST = {
   metadata: {
     name: 'ChatGPT Code Review',
-    version: '1.0.0',
-    description: 'Review code diffs submitted through the Kawnix invocation gateway.',
+    version: '2.0.0',
+    description: 'Review GitHub pull requests submitted through Kawnix.',
     owner: 'publisher',
   },
   endpoint: {
@@ -18,30 +18,47 @@ export const KAWNIX_PROVIDER_MANIFEST = {
     baseUrl: 'https://<your-public-domain>',
     timeoutMs: 30000,
     auth: {
-      type: 'none',
-      note: 'The gateway-level Kawnix signature is verified before the request body is parsed.',
+      type: 'bearer',
+      note: 'The bearer token is stored and supplied by Kawnix.',
     },
   },
   input: {
     type: 'object',
     required: ['operation'],
     properties: {
-      operation: { type: 'string', enum: ['health', 'review'] },
+      operation: { type: 'string', enum: ['health', 'start', 'status'] },
+      repository: {
+        type: 'object',
+        properties: {
+          owner: { type: 'string', maxLength: 100 },
+          name: { type: 'string', maxLength: 100 },
+        },
+        required: ['owner', 'name'],
+        additionalProperties: false,
+      },
+      pull_request_number: { type: 'integer', minimum: 1 },
+      commit_sha: { type: 'string', maxLength: 128 },
+      publishing_mode: {
+        type: 'string',
+        enum: ['report_only', 'pull_request_review'],
+        default: 'report_only',
+      },
       prompt: { type: 'string', maxLength: 2000 },
-      diff: { type: 'string', maxLength: 20000 },
-      file: { type: 'string', maxLength: 256 },
-      repo: { type: 'string', maxLength: 256 },
+      include_patterns: { type: 'array', maxItems: 100 },
+      ignore_patterns: { type: 'array', maxItems: 100 },
+      idempotency_key: { type: 'string', maxLength: 256 },
+      job_id: { type: 'string', maxLength: 256 },
     },
     additionalProperties: false,
   },
   capabilities: {
-    sync: true,
+    sync: false,
     streaming: false,
     multipart: false,
     customResponseMappings: false,
   },
   auth: {
-    type: 'none',
+    type: 'bearer',
   },
   pricing: {
     model: 'per_call',
@@ -49,20 +66,15 @@ export const KAWNIX_PROVIDER_MANIFEST = {
     note: 'No token-metered billing is enabled for this provider endpoint.',
   },
   successCriteria: {
-    statusCode: 200,
+    statusCodes: [200, 202],
     responseBody: {
       type: 'object',
-      required: ['success', 'response'],
+      required: ['success'],
       properties: {
         success: { type: 'boolean', const: true },
-        response: {
-          type: 'object',
-          properties: {
-            answer: { type: 'string' },
-          },
-          required: ['answer'],
-          additionalProperties: true,
-        },
+        job_id: { type: 'string' },
+        status: { type: 'string' },
+        result: { type: 'object' },
       },
       additionalProperties: true,
     },

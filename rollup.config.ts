@@ -39,4 +39,20 @@ export default defineConfig([
     },
     plugins: [esbuild()],
   },
+  {
+    input: ['api/kawnix/invoke/index.ts'],
+    output: {
+      dir: 'dist/api/kawnix/invoke',
+      format: 'esm',
+    },
+    plugins: [esbuild()],
+  },
+  {
+    input: ['api/kawnix/worker/index.ts'],
+    output: {
+      dir: 'dist/api/kawnix/worker',
+      format: 'esm',
+    },
+    plugins: [esbuild()],
+  },
 ]);

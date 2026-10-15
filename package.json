@@ -16,7 +16,7 @@
   "scripts": {
     "start": "node -r dotenv/config ./dist/index.js",
     "test": "jest",
-    "build": "rm -rf dist && rollup -c rollup.config.ts --configPlugin @rollup/plugin-typescript && ncc build src/github-action.cjs -o action",
+    "build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && rollup -c rollup.config.ts --configPlugin @rollup/plugin-typescript && ncc build src/github-action.cjs -o action",
     "build:lambda": "ncc build src/aws-lambda.cjs -o lambda"
   },
   "dependencies": {
@@ -28,6 +28,7 @@
     "minimatch": "^10.0.1",
     "next": "^13.1.6",
     "node-fetch": "^3.3.0",
+    "pg": "^8.23.1",
     "probot": "^12.2.4"
   },
   "devDependencies": {
@@ -37,6 +38,7 @@
     "@rollup/plugin-typescript": "^11.0.0",
     "@types/jest": "^29.0.0",
     "@types/node": "^18.0.0",
+    "@types/pg": "^8.23.1",
     "@types/pino-std-serializers": "^4.0.0",
     "@vercel/ncc": "^0.36.1",
     "esbuild": "^0.17.7",

@@ -15,7 +15,9 @@ type FetchMock = (
 }>;
 
 const fetchMock = jest.fn<ReturnType<FetchMock>, Parameters<FetchMock>>();
-const runtimeGlobal = globalThis as typeof globalThis & { fetch: FetchMock };
+const runtimeGlobal = globalThis as typeof globalThis & {
+  fetch: FetchMock;
+};
 const originalFetch = runtimeGlobal.fetch;
 
 describe('Chat', () => {
@@ -23,7 +25,10 @@ describe('Chat', () => {
 
   beforeEach(() => {
     process.env = { ...originalEnv };
-    runtimeGlobal.fetch = fetchMock;
+    Object.defineProperty(runtimeGlobal, 'fetch', {
+      configurable: true,
+      value: fetchMock,
+    });
     fetchMock.mockReset();
     fetchMock.mockResolvedValue({
       ok: true,
@@ -41,7 +46,10 @@ describe('Chat', () => {
 
   afterEach(() => {
     process.env = originalEnv;
-    runtimeGlobal.fetch = originalFetch;
+    Object.defineProperty(runtimeGlobal, 'fetch', {
+      configurable: true,
+      value: originalFetch,
+    });
   });
 
   test('uses Gemini API with the default model and API key', async () => {

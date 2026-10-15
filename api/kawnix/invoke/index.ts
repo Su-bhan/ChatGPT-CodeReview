@@ -1,27 +1,48 @@
-import { executeProviderOperation, handleKawnixRequest } from '../../../src/kawnix.js';
+import { handleKawnixProviderRequest } from '../../../src/kawnix-provider.js';
+import {
+  createInMemoryKawnixJobHandlers,
+  InMemoryKawnixJobStore,
+} from '../../../src/kawnix-jobs.js';
+import { PostgresKawnixJobStore } from '../../../src/postgres-kawnix-jobs.js';
 
 export const config = {
-  runtime: 'edge',
+  runtime: 'nodejs18.x',
 };
 
+const jobStore = process.env.DATABASE_URL
+  ? new PostgresKawnixJobStore(process.env.DATABASE_URL)
+  : new InMemoryKawnixJobStore();
+
 export default async function handler(request: Request) {
-  const secret = process.env.KAWNIX_PROVIDER_SECRET ?? '';
+  const bearerToken = process.env.KAWNIX_PROVIDER_TOKEN ?? '';
+  const appId = process.env.APP_ID ?? '';
+  const privateKey = process.env.PRIVATE_KEY ?? '';
+  const geminiApiKey = process.env.GEMINI_API_KEY ?? '';
+  const isConfigured = Boolean(
+    appId && privateKey && geminiApiKey && process.env.DATABASE_URL
+  );
+  const hasExecutionConfig = Boolean(appId && privateKey && geminiApiKey);
+  const handlers = createInMemoryKawnixJobHandlers(jobStore);
 
-  if (!secret) {
-    return Response.json(
-      {
-        success: false,
-        error: {
-          code: 'missing_secret',
-          message: 'Kawnix provider secret is not configured.',
+  return handleKawnixProviderRequest(request, {
+    bearerToken,
+    handlers: {
+      ...handlers,
+      health: () => ({
+        status: isConfigured ? 'ready' : 'degraded',
+        service: 'chatgpt-codereview',
+        capabilities: {
+          review_pull_request: hasExecutionConfig,
+          publish_review: hasExecutionConfig,
+          streaming: false,
         },
-      },
-      { status: 500 }
-    );
-  }
-
-  return handleKawnixRequest(request, {
-    secret,
-    agent: executeProviderOperation,
+        message:
+          isConfigured
+            ? 'Provider is configured for review execution and durable persistence.'
+            : hasExecutionConfig
+              ? 'Review execution is configured, but DATABASE_URL is required for production.'
+              : 'GitHub App and Gemini credentials are required for review execution.',
+      }),
+    },
   });
 }
