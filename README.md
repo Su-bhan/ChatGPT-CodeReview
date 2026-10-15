@@ -101,6 +101,9 @@ The provider exposes:
 Use [KAWNIX_DEPLOYMENT.md](./KAWNIX_DEPLOYMENT.md) for deployment, secret,
 scheduler, GitHub App, and Kawnix registration instructions.
 
+For a complete plain-language explanation of the implementation and remaining
+release steps, read [KAWNIX_COMPLETE_GUIDE.md](./KAWNIX_COMPLETE_GUIDE.md).
+
 ## Dev
 
 ### Setup
