@@ -1,5 +1,6 @@
 import {
   InMemoryKawnixJobStore,
+  KawnixJobError,
   processNextKawnixJob,
   type KawnixJob,
 } from './kawnix-jobs';
@@ -57,6 +58,51 @@ describe('Kawnix worker boundary', () => {
       id: job.id,
       status: 'running',
       stage: 'reviewing',
+    });
+  });
+
+  test('requeues a transient failure until the attempt limit is reached', async () => {
+      const store = new InMemoryKawnixJobStore();
+      await store.create({ ...job, attempt: 1, maxAttempts: 2 });
+
+      await expect(
+        processNextKawnixJob(store, async () => {
+          throw new KawnixJobError(503, 'upstream_unavailable', 'GitHub unavailable');
+        })
+      ).resolves.toBe(true);
+      await expect(store.get(job.id)).resolves.toMatchObject({
+        status: 'queued',
+        attempt: 2,
+        maxAttempts: 2,
+      });
+  });
+
+  test('does not retry permanent failures', async () => {
+      const store = new InMemoryKawnixJobStore();
+      await store.create({ ...job, attempt: 1, maxAttempts: 3 });
+
+      await processNextKawnixJob(store, async () => {
+        throw new KawnixJobError(403, 'forbidden', 'Repository is not authorized');
+      });
+      await expect(store.get(job.id)).resolves.toMatchObject({
+        status: 'failed',
+        failure: { code: 'forbidden' },
+        attempt: 1,
+      });
+  });
+
+  test('converts an execution timeout into a terminal failure', async () => {
+      const store = new InMemoryKawnixJobStore();
+      await store.create({ ...job, attempt: 3, maxAttempts: 3 });
+
+      await processNextKawnixJob(
+        store,
+        async () => new Promise(() => undefined),
+        { timeoutMs: 5 }
+      );
+      await expect(store.get(job.id)).resolves.toMatchObject({
+        status: 'failed',
+        failure: { code: 'review_timeout', message: 'Review job timed out.' },
     });
   });
 });

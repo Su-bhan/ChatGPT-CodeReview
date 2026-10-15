@@ -565,6 +565,17 @@ running lease has been stale for 15 minutes. PostgreSQL uses
 for development and tests. A production deployment still needs a scheduler or
 queue trigger to call the worker endpoint regularly.
 
+Worker execution now records an attempt count, applies a three-attempt default,
+requeues recognized transient upstream failures, and applies a ten-minute
+execution timeout. Permanent failures are stored without retrying. These
+defaults should be reviewed against the selected hosting platform and model
+latency before production activation.
+
+Review resource controls are also enforced before and during execution:
+maximum pull-request files, per-file and total patch bytes, finding count, and
+serialized result size. Exceeding a limit produces an explicit `413` review
+failure rather than silently truncating the review.
+
 ### Idempotency tasks
 
 1. Read `Idempotency-Key`.

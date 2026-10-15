@@ -1,4 +1,7 @@
-import { reviewPullRequest } from './kawnix-review';
+import {
+  KAWNIX_REVIEW_LIMITS,
+  reviewPullRequest,
+} from './kawnix-review';
 
 const input = {
   operation: 'start' as const,
@@ -121,5 +124,71 @@ describe('Kawnix pull-request review service', () => {
         ],
       })
     );
+  });
+
+  test('rejects pull requests with too many files', async () => {
+    const github = {
+      listPullRequestFiles: jest.fn(async () =>
+        Array.from({ length: KAWNIX_REVIEW_LIMITS.maxFiles + 1 }, (_, index) => ({
+          filename: `src/file-${index}.ts`,
+          status: 'modified',
+          patch,
+        }))
+      ),
+      createPullRequestReview: jest.fn(),
+    };
+
+    await expect(
+      reviewPullRequest({
+        input,
+        github,
+        chat: { codeReview: jest.fn() },
+      })
+    ).rejects.toMatchObject({
+      status: 413,
+      code: 'review_file_limit_exceeded',
+    });
+  });
+
+  test('rejects an oversized patch before calling Gemini', async () => {
+    const github = {
+      listPullRequestFiles: jest.fn(async () => [
+        {
+          filename: 'src/large.ts',
+          status: 'modified',
+          patch: 'x'.repeat(KAWNIX_REVIEW_LIMITS.maxPatchBytesPerFile + 1),
+        },
+      ]),
+      createPullRequestReview: jest.fn(),
+    };
+    const chat = { codeReview: jest.fn() };
+
+    await expect(reviewPullRequest({ input, github, chat })).rejects.toMatchObject({
+      status: 413,
+      code: 'review_patch_limit_exceeded',
+    });
+    expect(chat.codeReview).not.toHaveBeenCalled();
+  });
+
+  test('rejects a result with too many findings', async () => {
+    const github = {
+      listPullRequestFiles: jest.fn(async () => [
+        { filename: 'src/example.ts', status: 'modified', patch },
+      ]),
+      createPullRequestReview: jest.fn(),
+    };
+    const chat = {
+      codeReview: jest.fn(async () =>
+        Array.from({ length: KAWNIX_REVIEW_LIMITS.maxFindings + 1 }, () => ({
+          lgtm: false,
+          review_comment: 'This needs attention.',
+        }))
+      ),
+    };
+
+    await expect(reviewPullRequest({ input, github, chat })).rejects.toMatchObject({
+      status: 413,
+      code: 'review_finding_limit_exceeded',
+    });
   });
 });

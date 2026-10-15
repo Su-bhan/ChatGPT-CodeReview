@@ -10,6 +10,8 @@ type JobRow = QueryResultRow & {
   stage: KawnixJob['stage'];
   created_at: Date;
   updated_at: Date;
+  attempt: number;
+  max_attempts: number;
   input: KawnixJob['input'];
   result: KawnixJob['result'] | null;
   failure: KawnixJob['failure'] | null;
@@ -25,6 +27,8 @@ CREATE TABLE IF NOT EXISTS kawnix_review_jobs (
   stage TEXT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL,
+  attempt INTEGER NOT NULL DEFAULT 1,
+  max_attempts INTEGER NOT NULL DEFAULT 3,
   input JSONB NOT NULL,
   result JSONB,
   failure JSONB,
@@ -32,6 +36,10 @@ CREATE TABLE IF NOT EXISTS kawnix_review_jobs (
 );
 CREATE INDEX IF NOT EXISTS kawnix_review_jobs_owner_id_idx
   ON kawnix_review_jobs (owner_id);
+ALTER TABLE kawnix_review_jobs
+  ADD COLUMN IF NOT EXISTS attempt INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE kawnix_review_jobs
+  ADD COLUMN IF NOT EXISTS max_attempts INTEGER NOT NULL DEFAULT 3;
 `;
 
 const toJob = (row: JobRow): KawnixJob => ({
@@ -42,6 +50,8 @@ const toJob = (row: JobRow): KawnixJob => ({
   stage: row.stage,
   createdAt: row.created_at.toISOString(),
   updatedAt: row.updated_at.toISOString(),
+  attempt: row.attempt,
+  maxAttempts: row.max_attempts,
   input: row.input,
   ...(row.result ? { result: row.result } : {}),
   ...(row.failure ? { failure: row.failure } : {}),
@@ -78,8 +88,8 @@ export class PostgresKawnixJobStore implements KawnixJobStore {
     await this.query(
       `INSERT INTO kawnix_review_jobs
        (id, owner_id, idempotency_key, request_hash, status, stage,
-        created_at, updated_at, input, result, failure)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+        created_at, updated_at, attempt, max_attempts, input, result, failure)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
       [
         job.id,
         job.ownerId,
@@ -89,6 +99,8 @@ export class PostgresKawnixJobStore implements KawnixJobStore {
         job.stage,
         job.createdAt,
         job.updatedAt,
+        job.attempt ?? 1,
+        job.maxAttempts ?? 3,
         job.input,
         job.result ?? null,
         job.failure ?? null,
@@ -104,8 +116,8 @@ export class PostgresKawnixJobStore implements KawnixJobStore {
       const inserted = await client.query<JobRow>(
         `INSERT INTO kawnix_review_jobs
          (id, owner_id, idempotency_key, request_hash, status, stage,
-          created_at, updated_at, input, result, failure)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+          created_at, updated_at, attempt, max_attempts, input, result, failure)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
          ON CONFLICT (owner_id, idempotency_key) DO NOTHING
          RETURNING *`,
         [
@@ -117,6 +129,8 @@ export class PostgresKawnixJobStore implements KawnixJobStore {
           job.stage,
           job.createdAt,
           job.updatedAt,
+          job.attempt ?? 1,
+          job.maxAttempts ?? 3,
           job.input,
           job.result ?? null,
           job.failure ?? null,
@@ -195,14 +209,16 @@ export class PostgresKawnixJobStore implements KawnixJobStore {
   async update(job: KawnixJob) {
     await this.query(
       `UPDATE kawnix_review_jobs
-       SET status = $2, stage = $3, updated_at = $4, input = $5,
-           result = $6, failure = $7
+       SET status = $2, stage = $3, updated_at = $4, attempt = $5,
+           max_attempts = $6, input = $7, result = $8, failure = $9
        WHERE id = $1`,
       [
         job.id,
         job.status,
         job.stage,
         job.updatedAt,
+        job.attempt ?? 1,
+        job.maxAttempts ?? 3,
         job.input,
         job.result ?? null,
         job.failure ?? null,

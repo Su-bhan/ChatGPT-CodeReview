@@ -7,6 +7,26 @@ import {
 import { Chat } from './chat.js';
 import type { KawnixStartInput } from './provider-contract.js';
 
+export const KAWNIX_REVIEW_LIMITS = {
+  maxFiles: 100,
+  maxPatchBytesPerFile: 200_000,
+  maxTotalPatchBytes: 1_000_000,
+  maxFindings: 100,
+  maxResultBytes: 256_000,
+} as const;
+
+export class KawnixReviewError extends Error {
+  public readonly code: string;
+  public readonly status: number;
+
+  constructor(status: number, code: string, message: string) {
+    super(message);
+    this.name = 'KawnixReviewError';
+    this.status = status;
+    this.code = code;
+  }
+}
+
 type GitHubPullRequestFile = {
   filename: string;
   status: string;
@@ -117,7 +137,37 @@ export const reviewPullRequest = async ({
     input.repository.name,
     input.pull_request_number
   );
+  if (files.length > KAWNIX_REVIEW_LIMITS.maxFiles) {
+    throw new KawnixReviewError(
+      413,
+      'review_file_limit_exceeded',
+      `Pull request contains more than ${KAWNIX_REVIEW_LIMITS.maxFiles} files.`
+    );
+  }
   const filesToReview = files.filter((file) => shouldReviewFile(file, input));
+  const totalPatchBytes = filesToReview.reduce(
+    (total, file) => total + Buffer.byteLength(file.patch ?? '', 'utf8'),
+    0
+  );
+  const oversizedFile = filesToReview.find(
+    (file) =>
+      Buffer.byteLength(file.patch ?? '', 'utf8') >
+      KAWNIX_REVIEW_LIMITS.maxPatchBytesPerFile
+  );
+  if (oversizedFile) {
+    throw new KawnixReviewError(
+      413,
+      'review_patch_limit_exceeded',
+      `Patch for ${oversizedFile.filename} exceeds the per-file review limit.`
+    );
+  }
+  if (totalPatchBytes > KAWNIX_REVIEW_LIMITS.maxTotalPatchBytes) {
+    throw new KawnixReviewError(
+      413,
+      'review_patch_limit_exceeded',
+      'The pull request exceeds the total review patch limit.'
+    );
+  }
   const findings: KawnixReviewFinding[] = [];
   const bodyComments: string[] = [];
 
@@ -128,6 +178,13 @@ export const reviewPullRequest = async ({
     for (const review of asReviews(result as ReviewResponse | ReviewResponse[])) {
       if (review.lgtm || !review.review_comment) {
         continue;
+      }
+      if (findings.length >= KAWNIX_REVIEW_LIMITS.maxFindings) {
+        throw new KawnixReviewError(
+          413,
+          'review_finding_limit_exceeded',
+          `Review produced more than ${KAWNIX_REVIEW_LIMITS.maxFindings} findings.`
+        );
       }
 
       const inlineComment = createInlineReviewComment(
@@ -162,6 +219,26 @@ export const reviewPullRequest = async ({
     published: false,
   } as KawnixReviewResult['publication'];
 
+  const result = {
+    status: 'completed' as const,
+    lgtm: findings.length === 0,
+    summary:
+      findings.length === 0
+        ? 'No review findings were identified.'
+        : `${findings.length} review finding${findings.length === 1 ? '' : 's'} identified.`,
+    findings,
+    files_reviewed: filesToReview.length,
+    files_skipped: files.length - filesToReview.length,
+    publication,
+  };
+  if (Buffer.byteLength(JSON.stringify(result), 'utf8') > KAWNIX_REVIEW_LIMITS.maxResultBytes) {
+    throw new KawnixReviewError(
+      413,
+      'review_result_limit_exceeded',
+      'The generated review result exceeds the result size limit.'
+    );
+  }
+
   if (publication.mode === 'pull_request_review') {
     const review = await github.createPullRequestReview({
       owner: input.repository.owner,
@@ -193,16 +270,5 @@ export const reviewPullRequest = async ({
     publication.url = review.htmlUrl;
   }
 
-  return {
-    status: 'completed',
-    lgtm: findings.length === 0,
-    summary:
-      findings.length === 0
-        ? 'No review findings were identified.'
-        : `${findings.length} review finding${findings.length === 1 ? '' : 's'} identified.`,
-    findings,
-    files_reviewed: filesToReview.length,
-    files_skipped: files.length - filesToReview.length,
-    publication,
-  };
+  return result;
 };

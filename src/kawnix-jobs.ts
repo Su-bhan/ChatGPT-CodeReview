@@ -27,6 +27,8 @@ export type KawnixJob = {
   stage: 'queued' | 'reviewing' | 'publishing' | 'completed' | 'failed';
   createdAt: string;
   updatedAt: string;
+  attempt?: number;
+  maxAttempts?: number;
   input: Omit<KawnixStartInput, 'operation'>;
   result?: Record<string, unknown>;
   failure?: {
@@ -166,6 +168,8 @@ export const createInMemoryKawnixJobHandlers = (
       stage: 'queued',
       createdAt: now,
       updatedAt: now,
+      attempt: 1,
+      maxAttempts: DEFAULT_MAX_ATTEMPTS,
       input: {
         repository: input.repository,
         pull_request_number: input.pull_request_number,
@@ -246,9 +250,47 @@ export const runKawnixJob = async (
   }
 };
 
+const DEFAULT_MAX_ATTEMPTS = 3;
+const DEFAULT_TIMEOUT_MS = 10 * 60 * 1000;
+
+const isRetryableJobError = (error: unknown) => {
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+  const status = 'status' in error ? error.status : undefined;
+  if (typeof status === 'number') {
+    return [429, 502, 503, 504].includes(status);
+  }
+  const code = 'code' in error ? error.code : undefined;
+  return ['ECONNRESET', 'ETIMEDOUT', 'EAI_AGAIN'].includes(String(code));
+};
+
+const withTimeout = async <T>(promise: Promise<T>, timeoutMs: number) => {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timeout = setTimeout(
+          () => reject(new KawnixJobError(504, 'review_timeout', 'Review job timed out.')),
+          timeoutMs
+        );
+      }),
+    ]);
+  } finally {
+    if (timeout) {
+      clearTimeout(timeout);
+    }
+  }
+};
+
 export const processNextKawnixJob = async (
   store: KawnixJobStore,
-  execute: (input: KawnixStartInput) => Promise<Record<string, unknown>>
+  execute: (input: KawnixStartInput) => Promise<Record<string, unknown>>,
+  options: {
+    maxAttempts?: number;
+    timeoutMs?: number;
+  } = {}
 ) => {
   const job = await store.claimNextQueued();
   if (!job) {
@@ -256,7 +298,10 @@ export const processNextKawnixJob = async (
   }
 
   try {
-    const result = await execute(getJobInput(job));
+    const result = await withTimeout(
+      execute(getJobInput(job)),
+      options.timeoutMs ?? DEFAULT_TIMEOUT_MS
+    );
     await store.update({
       ...job,
       status: 'completed',
@@ -265,15 +310,34 @@ export const processNextKawnixJob = async (
       result,
     });
   } catch (error) {
+    const attempt = job.attempt ?? 1;
+    const maxAttempts = job.maxAttempts ?? options.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
+    if (isRetryableJobError(error) && attempt < maxAttempts) {
+      await store.update({
+        ...job,
+        status: 'queued',
+        stage: 'queued',
+        updatedAt: new Date().toISOString(),
+        attempt: attempt + 1,
+        maxAttempts,
+      });
+      return true;
+    }
     await store.update({
       ...job,
       status: 'failed',
       stage: 'failed',
       updatedAt: new Date().toISOString(),
       failure: {
-        code: 'review_failed',
+        code:
+          error && typeof error === 'object' && 'code' in error &&
+          typeof error.code === 'string'
+            ? error.code
+            : 'review_failed',
         message: error instanceof Error ? error.message : 'Review job failed.',
       },
+      attempt,
+      maxAttempts,
     });
   }
   return true;

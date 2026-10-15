@@ -51,6 +51,13 @@ export const KAWNIX_PROVIDER_MANIFEST = {
     },
     additionalProperties: false,
   },
+  limits: {
+    maxFiles: 100,
+    maxPatchBytesPerFile: 200000,
+    maxTotalPatchBytes: 1000000,
+    maxFindings: 100,
+    maxResultBytes: 256000,
+  },
   capabilities: {
     sync: false,
     streaming: false,
