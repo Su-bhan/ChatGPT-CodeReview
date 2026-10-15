@@ -11,6 +11,29 @@ import {
 } from './kawnix-review.js';
 import type { Chat } from './chat.js';
 
+export const KAWNIX_CONCURRENCY_LIMITS = {
+  maxConcurrentPerOwner: 1,
+  maxConcurrentGlobal: 5,
+} as const;
+
+export const KAWNIX_RETENTION_DEFAULTS = {
+  queuedTtlMs: 24 * 60 * 60 * 1000,
+  runningTtlMs: 30 * 60 * 1000,
+  terminalTtlMs: 7 * 24 * 60 * 60 * 1000,
+} as const;
+
+export type KawnixCleanupOptions = {
+  now?: Date;
+  queuedTtlMs?: number;
+  runningTtlMs?: number;
+  terminalTtlMs?: number;
+};
+
+export type KawnixCleanupSummary = {
+  expired: number;
+  deleted: number;
+};
+
 export type KawnixJobStatus =
   | 'queued'
   | 'running'
@@ -43,12 +66,16 @@ export type KawnixJobStore = {
     job: KawnixJob
   ): Promise<KawnixJob | undefined>;
   get(jobId: string): Promise<KawnixJob | undefined>;
-  claimNextQueued(staleAfterMs?: number): Promise<KawnixJob | undefined>;
+  claimNextQueued(
+    staleAfterMs?: number,
+    limits?: typeof KAWNIX_CONCURRENCY_LIMITS
+  ): Promise<KawnixJob | undefined>;
   update(job: KawnixJob): Promise<void>;
   findByIdempotency(
     ownerId: string,
     idempotencyKey: string
   ): Promise<KawnixJob | undefined>;
+  cleanup(options?: KawnixCleanupOptions): Promise<KawnixCleanupSummary>;
 };
 
 export class InMemoryKawnixJobStore implements KawnixJobStore {
@@ -62,7 +89,10 @@ export class InMemoryKawnixJobStore implements KawnixJobStore {
     return this.jobs.get(jobId);
   }
 
-  async claimNextQueued(staleAfterMs = 15 * 60 * 1000) {
+  async claimNextQueued(
+    staleAfterMs = 15 * 60 * 1000,
+    limits = KAWNIX_CONCURRENCY_LIMITS
+  ) {
     const now = Date.now();
     for (const candidate of this.jobs.values()) {
       if (
@@ -77,9 +107,21 @@ export class InMemoryKawnixJobStore implements KawnixJobStore {
         });
       }
     }
-    const job = Array.from(this.jobs.values()).find(
-      (candidate) => candidate.status === 'queued'
+    const running = Array.from(this.jobs.values()).filter(
+      (candidate) => candidate.status === 'running'
     );
+    if (running.length >= limits.maxConcurrentGlobal) {
+      return undefined;
+    }
+    const job = Array.from(this.jobs.values()).find((candidate) => {
+      if (candidate.status !== 'queued') {
+        return false;
+      }
+      return (
+        running.filter((active) => active.ownerId === candidate.ownerId).length <
+        limits.maxConcurrentPerOwner
+      );
+    });
     if (!job) {
       return undefined;
     }
@@ -107,6 +149,44 @@ export class InMemoryKawnixJobStore implements KawnixJobStore {
       }
     }
     return undefined;
+  }
+
+  async cleanup(
+    options: KawnixCleanupOptions = {}
+  ): Promise<KawnixCleanupSummary> {
+    const now = options.now?.getTime() ?? Date.now();
+    const queuedCutoff = now - (options.queuedTtlMs ?? KAWNIX_RETENTION_DEFAULTS.queuedTtlMs);
+    const runningCutoff = now - (options.runningTtlMs ?? KAWNIX_RETENTION_DEFAULTS.runningTtlMs);
+    const terminalCutoff = now - (options.terminalTtlMs ?? KAWNIX_RETENTION_DEFAULTS.terminalTtlMs);
+    let expired = 0;
+    let deleted = 0;
+
+    for (const job of this.jobs.values()) {
+      const updatedAt = Date.parse(job.updatedAt);
+      const isStale =
+        (job.status === 'queued' && updatedAt < queuedCutoff) ||
+        (job.status === 'running' && updatedAt < runningCutoff);
+      if (isStale) {
+        this.jobs.set(job.id, {
+          ...job,
+          status: 'expired',
+          stage: 'failed',
+          updatedAt: new Date(now).toISOString(),
+          failure: {
+            code: 'job_expired',
+            message: 'The review job expired before it completed.',
+          },
+        });
+        expired += 1;
+      } else if (
+        ['completed', 'failed', 'cancelled', 'expired'].includes(job.status) &&
+        updatedAt < terminalCutoff
+      ) {
+        this.jobs.delete(job.id);
+        deleted += 1;
+      }
+    }
+    return { expired, deleted };
   }
 }
 

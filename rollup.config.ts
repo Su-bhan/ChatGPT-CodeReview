@@ -55,4 +55,12 @@ export default defineConfig([
     },
     plugins: [esbuild()],
   },
+  {
+    input: ['api/kawnix/maintenance/index.ts'],
+    output: {
+      dir: 'dist/api/kawnix/maintenance',
+      format: 'esm',
+    },
+    plugins: [esbuild()],
+  },
 ]);

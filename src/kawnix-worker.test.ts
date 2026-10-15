@@ -43,6 +43,46 @@ describe('Kawnix worker boundary', () => {
     ).resolves.toBe(false);
   });
 
+  test('enforces per-owner concurrency limits', async () => {
+    const store = new InMemoryKawnixJobStore();
+    await store.create({
+      ...job,
+      id: 'job_running',
+      status: 'running',
+      stage: 'reviewing',
+    });
+    await store.create({
+      ...job,
+      id: 'job_queued',
+      status: 'queued',
+      stage: 'queued',
+    });
+
+    await expect(store.claimNextQueued()).resolves.toBeUndefined();
+  });
+
+  test('allows a different owner while one owner is running', async () => {
+    const store = new InMemoryKawnixJobStore();
+    await store.create({
+      ...job,
+      id: 'job_running',
+      status: 'running',
+      stage: 'reviewing',
+    });
+    await store.create({
+      ...job,
+      id: 'job_other_owner',
+      ownerId: 'other-owner',
+      status: 'queued',
+      stage: 'queued',
+    });
+
+    await expect(store.claimNextQueued()).resolves.toMatchObject({
+      id: 'job_other_owner',
+      status: 'running',
+    });
+  });
+
   test('requeues a stale running job before claiming work', async () => {
     const store = new InMemoryKawnixJobStore();
     await store.create({
@@ -103,6 +143,37 @@ describe('Kawnix worker boundary', () => {
       await expect(store.get(job.id)).resolves.toMatchObject({
         status: 'failed',
         failure: { code: 'review_timeout', message: 'Review job timed out.' },
-    });
+      });
+  });
+
+  test('expires abandoned jobs and deletes old terminal jobs', async () => {
+      const store = new InMemoryKawnixJobStore();
+      const now = new Date('2026-01-10T00:00:00.000Z');
+      await store.create({
+        ...job,
+        id: 'job_stale_queued',
+        status: 'queued',
+        updatedAt: '2026-01-08T00:00:00.000Z',
+      });
+      await store.create({
+        ...job,
+        id: 'job_old_completed',
+        status: 'completed',
+        stage: 'completed',
+        updatedAt: '2025-12-01T00:00:00.000Z',
+      });
+
+      await expect(
+        store.cleanup({
+          now,
+          queuedTtlMs: 24 * 60 * 60 * 1000,
+          terminalTtlMs: 7 * 24 * 60 * 60 * 1000,
+        })
+      ).resolves.toEqual({ expired: 1, deleted: 1 });
+      await expect(store.get('job_stale_queued')).resolves.toMatchObject({
+        status: 'expired',
+        failure: { code: 'job_expired' },
+      });
+      await expect(store.get('job_old_completed')).resolves.toBeUndefined();
   });
 });

@@ -576,6 +576,17 @@ maximum pull-request files, per-file and total patch bytes, finding count, and
 serialized result size. Exceeding a limit produces an explicit `413` review
 failure rather than silently truncating the review.
 
+The worker claim boundary now enforces a default concurrency limit of one
+running review per provider owner and five running reviews globally. The
+PostgreSQL implementation serializes claims with a transaction advisory lock
+so multiple worker instances observe the same limits.
+
+Retention cleanup is available through the protected maintenance endpoint.
+Abandoned queued jobs older than 24 hours and running jobs older than 30
+minutes are marked `expired`; terminal jobs older than seven days are deleted.
+The endpoint is intended for a scheduled maintenance trigger and uses the
+worker token.
+
 ### Idempotency tasks
 
 1. Read `Idempotency-Key`.

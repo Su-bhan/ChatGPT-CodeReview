@@ -57,6 +57,8 @@ export const KAWNIX_PROVIDER_MANIFEST = {
     maxTotalPatchBytes: 1000000,
     maxFindings: 100,
     maxResultBytes: 256000,
+    maxConcurrentPerOwner: 1,
+    maxConcurrentGlobal: 5,
   },
   capabilities: {
     sync: false,

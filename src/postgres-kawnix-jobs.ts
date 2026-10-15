@@ -1,6 +1,13 @@
 import { Pool, type PoolConfig, type QueryResultRow } from 'pg';
 
-import type { KawnixJob, KawnixJobStore } from './kawnix-jobs.js';
+import {
+  KAWNIX_CONCURRENCY_LIMITS,
+  KAWNIX_RETENTION_DEFAULTS,
+  type KawnixCleanupOptions,
+  type KawnixCleanupSummary,
+  type KawnixJob,
+  type KawnixJobStore,
+} from './kawnix-jobs.js';
 
 type JobRow = QueryResultRow & {
   id: string;
@@ -164,11 +171,15 @@ export class PostgresKawnixJobStore implements KawnixJobStore {
     return result.rows[0] ? toJob(result.rows[0]) : undefined;
   }
 
-  async claimNextQueued(staleAfterMs = 15 * 60 * 1000) {
+  async claimNextQueued(
+    staleAfterMs = 15 * 60 * 1000,
+    limits = KAWNIX_CONCURRENCY_LIMITS
+  ) {
     await this.ensureReady();
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');
+      await client.query('SELECT pg_advisory_xact_lock($1)', [874291]);
       const staleBefore = new Date(Date.now() - staleAfterMs);
       await client.query(
         `UPDATE kawnix_review_jobs
@@ -176,12 +187,30 @@ export class PostgresKawnixJobStore implements KawnixJobStore {
          WHERE status = 'running' AND updated_at < $1`,
         [staleBefore]
       );
+      const running = await client.query<{ total: string }>(
+        `SELECT COUNT(*)::text AS total
+         FROM kawnix_review_jobs
+         WHERE status = 'running'`
+      );
+      if (Number(running.rows[0]?.total ?? 0) >= limits.maxConcurrentGlobal) {
+        await client.query('COMMIT');
+        return undefined;
+      }
       const result = await client.query<JobRow>(
         `SELECT * FROM kawnix_review_jobs
          WHERE status = 'queued'
+           AND NOT EXISTS (
+             SELECT 1
+             FROM kawnix_review_jobs active
+             WHERE active.status = 'running'
+               AND active.owner_id = kawnix_review_jobs.owner_id
+             GROUP BY active.owner_id
+             HAVING COUNT(*) >= $1
+           )
          ORDER BY created_at
          FOR UPDATE SKIP LOCKED
-         LIMIT 1`
+         LIMIT 1`,
+        [limits.maxConcurrentPerOwner]
       );
       const row = result.rows[0];
       if (!row) {
@@ -233,6 +262,60 @@ export class PostgresKawnixJobStore implements KawnixJobStore {
       [ownerId, idempotencyKey]
     );
     return result.rows[0] ? toJob(result.rows[0]) : undefined;
+  }
+
+  async cleanup(
+    options: KawnixCleanupOptions = {}
+  ): Promise<KawnixCleanupSummary> {
+    const now = options.now ?? new Date();
+    const queuedCutoff = new Date(
+      now.getTime() -
+        (options.queuedTtlMs ?? KAWNIX_RETENTION_DEFAULTS.queuedTtlMs)
+    );
+    const runningCutoff = new Date(
+      now.getTime() -
+        (options.runningTtlMs ?? KAWNIX_RETENTION_DEFAULTS.runningTtlMs)
+    );
+    const terminalCutoff = new Date(
+      now.getTime() -
+        (options.terminalTtlMs ?? KAWNIX_RETENTION_DEFAULTS.terminalTtlMs)
+    );
+    const expired = await this.query<{ count: string }>(
+      `WITH expired AS (
+         UPDATE kawnix_review_jobs
+         SET status = 'expired',
+             stage = 'failed',
+             updated_at = $1,
+             failure = $2
+         WHERE (status = 'queued' AND updated_at < $3)
+            OR (status = 'running' AND updated_at < $4)
+         RETURNING id
+       )
+       SELECT COUNT(*)::text AS count FROM expired`,
+      [
+        now,
+        {
+          code: 'job_expired',
+          message: 'The review job expired before it completed.',
+        },
+        queuedCutoff,
+        runningCutoff,
+      ]
+    );
+    const deleted = await this.query<{ count: string }>(
+      `WITH removed AS (
+         DELETE FROM kawnix_review_jobs
+         WHERE status IN ('completed', 'failed', 'cancelled', 'expired')
+           AND updated_at < $1
+         RETURNING id
+       )
+       SELECT COUNT(*)::text AS count FROM removed`,
+      [terminalCutoff]
+    );
+    return {
+      expired: Number(expired.rows[0]?.count ?? 0),
+      deleted: Number(deleted.rows[0]?.count ?? 0),
+    };
   }
 
   async close() {
