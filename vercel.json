@@ -23,6 +23,10 @@
   ],
   "routes": [
     {
+      "src": "^/$",
+      "dest": "/index.html"
+    },
+    {
       "src": "/api/github/webhooks(?:/)?",
       "dest": "/dist/api/github/webhooks/index.js"
     },
