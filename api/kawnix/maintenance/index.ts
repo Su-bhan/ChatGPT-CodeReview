@@ -1,5 +1,6 @@
 import { InMemoryKawnixJobStore } from '../../../src/kawnix-jobs.js';
 import { PostgresKawnixJobStore } from '../../../src/postgres-kawnix-jobs.js';
+import { jsonResponse } from '../../../src/json-response.js';
 
 export const config = {
   runtime: 'nodejs',
@@ -15,24 +16,24 @@ export default async function handler(request: Request) {
   const suppliedToken = authorization.replace(/^Bearer\s+/i, '').trim();
 
   if (request.method !== 'POST') {
-    return Response.json(
+    return jsonResponse(
       { success: false, error: { code: 'method_not_allowed' } },
-      { status: 405 }
+      405
     );
   }
   if (!maintenanceToken) {
-    return Response.json(
+    return jsonResponse(
       { success: false, error: { code: 'missing_maintenance_token' } },
-      { status: 500 }
+      500
     );
   }
   if (suppliedToken !== maintenanceToken) {
-    return Response.json(
+    return jsonResponse(
       { success: false, error: { code: 'invalid_maintenance_authentication' } },
-      { status: 401 }
+      401
     );
   }
 
   const cleanup = await jobStore.cleanup();
-  return Response.json({ success: true, cleanup });
+  return jsonResponse({ success: true, cleanup });
 }

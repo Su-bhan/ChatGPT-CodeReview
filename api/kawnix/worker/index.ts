@@ -10,6 +10,7 @@ import {
   parseKawnixRepositoryAccess,
 } from '../../../src/kawnix-authorization.js';
 import { getKawnixConfigStatus } from '../../../src/kawnix-config.js';
+import { jsonResponse } from '../../../src/json-response.js';
 
 export const config = {
   runtime: 'nodejs',
@@ -28,27 +29,27 @@ export default async function handler(request: Request) {
   const authorization = request.headers.get('Authorization') ?? '';
   const suppliedToken = authorization.replace(/^Bearer\s+/i, '').trim();
   if (!workerToken) {
-    return Response.json(
+    return jsonResponse(
       { success: false, error: { code: 'missing_worker_token' } },
-      { status: 500 }
+      500
     );
   }
   if (request.method !== 'POST' || suppliedToken !== workerToken) {
-    return Response.json(
+    return jsonResponse(
       { success: false, error: { code: 'invalid_worker_authentication' } },
-      { status: 401 }
+      401
     );
   }
   if (!jobStore) {
-    return Response.json(
+    return jsonResponse(
       { success: false, error: { code: 'missing_database' } },
-      { status: 503 }
+      503
     );
   }
   if (!configStatus.repositoryAccess) {
-    return Response.json(
+    return jsonResponse(
       { success: false, error: { code: 'missing_repository_access_configuration' } },
-      { status: 503 }
+      503
     );
   }
 
@@ -56,9 +57,9 @@ export default async function handler(request: Request) {
   const privateKey = process.env.PRIVATE_KEY ?? '';
   const geminiApiKey = process.env.GEMINI_API_KEY ?? '';
   if (!appId || !privateKey || !geminiApiKey) {
-    return Response.json(
+    return jsonResponse(
       { success: false, error: { code: 'missing_execution_configuration' } },
-      { status: 503 }
+      503
     );
   }
 
@@ -70,5 +71,5 @@ export default async function handler(request: Request) {
     }),
     { authorizeRepository: repositoryAccess }
   );
-  return Response.json({ success: true, processed });
+  return jsonResponse({ success: true, processed });
 }

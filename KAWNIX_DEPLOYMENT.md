@@ -184,6 +184,10 @@ Invoke-RestMethod `
   -Body $body
 ```
 
+The `Authorization` header must use the `Bearer <raw-provider-token>` format.
+Store only the raw token in `KAWNIX_PROVIDER_TOKEN`; do not include the
+`Bearer ` prefix in the environment variable.
+
 The response must show:
 
 ```json
