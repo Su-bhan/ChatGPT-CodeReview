@@ -88,9 +88,9 @@ command exits with status `1` when a check fails.
 Import the repository into Vercel with the repository root as the project
 root. The committed `vercel.json` uses `npm run build` as the build command;
 Vercel discovers the TypeScript files under `api/` as Node.js Functions. The
-handlers explicitly use the Node.js 22 runtime, which matches the
-`engines.node` requirement in `package.json` and avoids the retired Node.js 18
-runtime.
+handlers explicitly select Vercel's `nodejs` runtime family. The Node.js
+version is pinned separately to 22.x by `engines.node` in `package.json` and
+the Vercel project setting, avoiding the retired Node.js 18 runtime.
 
 Add the variables in **Project Settings -> Environment Variables** for the
 Production environment (and Preview if you need preview deployments):
