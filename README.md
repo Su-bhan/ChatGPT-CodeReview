@@ -101,6 +101,15 @@ The provider exposes:
 Use [KAWNIX_DEPLOYMENT.md](./KAWNIX_DEPLOYMENT.md) for deployment, secret,
 scheduler, GitHub App, and Kawnix registration instructions.
 
+### Vercel deployment
+
+Import the repository into Vercel, keep the project root at the repository
+root, and configure the required production environment variables in the
+Vercel dashboard. Vercel discovers the handlers in `api/` automatically and
+uses the committed `vercel.json` build command. Follow the
+[Vercel-specific runbook](./KAWNIX_DEPLOYMENT.md#vercel) for the complete
+environment-variable, webhook, scheduler, and health-check setup.
+
 For a complete plain-language explanation of the implementation and remaining
 release steps, read [KAWNIX_COMPLETE_GUIDE.md](./KAWNIX_COMPLETE_GUIDE.md).
 

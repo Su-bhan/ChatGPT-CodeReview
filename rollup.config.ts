@@ -20,16 +20,6 @@ const plugins = () => [esbuild()];
 
 export default defineConfig([
   {
-    input: 'middleware.ts',
-    output: {
-      file: 'dist/middleware.js',
-      format: 'esm',
-      inlineDynamicImports: true,
-    },
-    external,
-    plugins: plugins(),
-  },
-  {
     input: 'src/bot.ts',
     output: {
       dir: 'dist/lib/',

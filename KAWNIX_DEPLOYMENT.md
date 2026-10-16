@@ -83,6 +83,53 @@ Run the preflight after replacing the placeholders in
 manifest, and the HTTPS endpoint without contacting GitHub or Gemini. The
 command exits with status `1` when a check fails.
 
+### Vercel
+
+Import the repository into Vercel with the repository root as the project
+root. The committed `vercel.json` uses `npm run build` as the build command;
+Vercel discovers the TypeScript files under `api/` as Node.js Functions. The
+handlers explicitly use the Node.js 22 runtime, which matches the
+`engines.node` requirement in `package.json` and avoids the retired Node.js 18
+runtime.
+
+Add the variables in **Project Settings -> Environment Variables** for the
+Production environment (and Preview if you need preview deployments):
+
+- `KAWNIX_PROVIDER_TOKEN`
+- `KAWNIX_WORKER_TOKEN`
+- `APP_ID`
+- `PRIVATE_KEY`
+- `GEMINI_API_KEY`
+- `DATABASE_URL`
+- `KAWNIX_REPOSITORY_ACCESS`
+
+Keep `PRIVATE_KEY`, `DATABASE_URL`, and all tokens encrypted as sensitive
+variables. Do not commit `.env`, put secrets in `vercel.json`, or expose them
+with a `NEXT_PUBLIC_`/client-side prefix. Redeploy after changing variables;
+Vercel applies environment variables when a deployment is built.
+
+The GitHub webhook URL is:
+
+```text
+https://<project-domain>/api/github/webhooks
+```
+
+The Kawnix invoke URL is:
+
+```text
+https://<project-domain>/api/kawnix/invoke
+```
+
+Vercel Functions are stateless between invocations, so `DATABASE_URL` is
+required for the worker queue. The invoke route intentionally reports a
+degraded health response when durable persistence or execution credentials are
+missing; do not register the endpoint with Kawnix until its health response
+reports `production_ready: true`.
+
+The project does not use Vercel Middleware. Webhook signatures and payload
+parsing must remain in Probot's Node.js handler: reading a webhook body in
+middleware would consume the request before Probot can verify and process it.
+
 The build must produce:
 
 ```text
