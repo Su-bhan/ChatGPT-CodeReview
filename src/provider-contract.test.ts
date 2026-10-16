@@ -1,7 +1,7 @@
 import {
   KAWNIX_INVOKE_ROUTE,
   validateKawnixInput,
-} from './provider-contract';
+} from './provider-contract.js';
 
 describe('Kawnix provider contract', () => {
   test('uses the canonical provider route', () => {

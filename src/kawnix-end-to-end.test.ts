@@ -1,16 +1,17 @@
 import { createHash } from 'node:crypto';
 
-import { handleKawnixProviderRequest } from './kawnix-provider';
+import { handleKawnixProviderRequest } from './kawnix-provider.js';
 import {
   createInMemoryKawnixJobHandlers,
   InMemoryKawnixJobStore,
   processNextKawnixJob,
-} from './kawnix-jobs';
+} from './kawnix-jobs.js';
 import {
   createKawnixRepositoryAuthorizer,
   parseKawnixRepositoryAccess,
-} from './kawnix-authorization';
-import { reviewPullRequest } from './kawnix-review';
+} from './kawnix-authorization.js';
+import { reviewPullRequest } from './kawnix-review.js';
+import type { KawnixStartInput } from './provider-contract.js';
 
 const token = 'end-to-end-provider-token';
 const repository = { owner: 'acme', name: 'service' };
@@ -51,7 +52,7 @@ describe('Kawnix provider end-to-end workflow', () => {
     };
     expect(startBody.data.status).toBe('queued');
 
-    const processResult = await processNextKawnixJob(store, (input) =>
+    const processResult = await processNextKawnixJob(store, (input: KawnixStartInput) =>
       reviewPullRequest({
         input,
         github: {

@@ -1,7 +1,7 @@
 import {
   createKawnixRepositoryAuthorizer,
   parseKawnixRepositoryAccess,
-} from './kawnix-authorization';
+} from './kawnix-authorization.js';
 
 describe('Kawnix repository authorization', () => {
   test('parses owner-scoped repository access', () => {

@@ -1,7 +1,7 @@
 import {
   createInMemoryKawnixJobHandlers,
   InMemoryKawnixJobStore,
-} from './kawnix-jobs';
+} from './kawnix-jobs.js';
 
 const token = 'job-test-token';
 const request = () =>

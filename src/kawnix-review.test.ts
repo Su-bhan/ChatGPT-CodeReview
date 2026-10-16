@@ -1,7 +1,7 @@
 import {
   KAWNIX_REVIEW_LIMITS,
   reviewPullRequest,
-} from './kawnix-review';
+} from './kawnix-review.js';
 
 const input = {
   operation: 'start' as const,

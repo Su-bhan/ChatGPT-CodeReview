@@ -1,6 +1,6 @@
-import { createGitHubAppClient } from './github-app-client';
+import { createGitHubAppClient } from './github-app-client.js';
 import { generateKeyPairSync } from 'node:crypto';
-import { reviewPullRequest } from './kawnix-review';
+import { reviewPullRequest } from './kawnix-review.js';
 
 const { privateKey } = generateKeyPairSync('rsa', {
   modulusLength: 2048,

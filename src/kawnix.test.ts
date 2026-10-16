@@ -4,7 +4,7 @@ import {
   KAWNIX_PROVIDER_ROUTE,
   buildKawnixSignaturePayload,
   handleKawnixRequest,
-} from './kawnix';
+} from './kawnix.js';
 
 const secret = 'kawnix-provider-secret';
 const endpointUrl = `https://provider.example.com${KAWNIX_PROVIDER_ROUTE}`;

@@ -1,6 +1,6 @@
-import { PostgresKawnixJobStore } from './postgres-kawnix-jobs';
+import { PostgresKawnixJobStore } from './postgres-kawnix-jobs.js';
 import { randomUUID } from 'node:crypto';
-import type { KawnixJob } from './kawnix-jobs';
+import type { KawnixJob } from './kawnix-jobs.js';
 
 describe('PostgresKawnixJobStore', () => {
   test('is constructed from a database URL', () => {

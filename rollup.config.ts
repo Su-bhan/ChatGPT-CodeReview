@@ -1,7 +1,22 @@
-import esbuild from 'rollup-plugin-esbuild';
 import { defineConfig } from 'rollup';
-import commonjs from '@rollup/plugin-commonjs';
-import nodeResolve from '@rollup/plugin-node-resolve';
+import { createRequire } from 'node:module';
+import type { Plugin } from 'rollup';
+
+type PluginFactory = (options?: Record<string, unknown>) => Plugin;
+
+const require = createRequire(`${process.cwd()}\\rollup.config.ts`);
+const loadPlugin = (name: string): PluginFactory => {
+  const module = require(name) as PluginFactory | { default: PluginFactory };
+  return typeof module === 'function' ? module : module.default;
+};
+
+const esbuild = loadPlugin('rollup-plugin-esbuild');
+const external = (id: string): boolean =>
+  !id.startsWith('.') &&
+  !id.startsWith('/') &&
+  !/^[A-Za-z]:[\\/]/.test(id);
+
+const plugins = () => [esbuild()];
 
 export default defineConfig([
   {
@@ -11,7 +26,8 @@ export default defineConfig([
       format: 'esm',
       inlineDynamicImports: true,
     },
-    plugins: [esbuild(), commonjs(), nodeResolve()],
+    external,
+    plugins: plugins(),
   },
   {
     input: 'src/bot.ts',
@@ -20,6 +36,7 @@ export default defineConfig([
       format: 'esm',
       inlineDynamicImports: false,
     },
+    external,
     plugins: [esbuild({ include: 'src/*.ts' })],
   },
   {
@@ -29,7 +46,8 @@ export default defineConfig([
       format: 'esm',
       inlineDynamicImports: false,
     },
-    plugins: [esbuild()],
+    external,
+    plugins: plugins(),
   },
   {
     input: ['api/github/webhooks/index.ts'],
@@ -37,7 +55,8 @@ export default defineConfig([
       dir: 'dist/api/github/webhooks',
       format: 'esm',
     },
-    plugins: [esbuild()],
+    external,
+    plugins: plugins(),
   },
   {
     input: ['api/kawnix/invoke/index.ts'],
@@ -45,7 +64,8 @@ export default defineConfig([
       dir: 'dist/api/kawnix/invoke',
       format: 'esm',
     },
-    plugins: [esbuild()],
+    external,
+    plugins: plugins(),
   },
   {
     input: ['api/kawnix/worker/index.ts'],
@@ -53,7 +73,8 @@ export default defineConfig([
       dir: 'dist/api/kawnix/worker',
       format: 'esm',
     },
-    plugins: [esbuild()],
+    external,
+    plugins: plugins(),
   },
   {
     input: ['api/kawnix/maintenance/index.ts'],
@@ -61,7 +82,8 @@ export default defineConfig([
       dir: 'dist/api/kawnix/maintenance',
       format: 'esm',
     },
-    plugins: [esbuild()],
+    external,
+    plugins: plugins(),
   },
   {
     input: ['src/kawnix-preflight.ts'],
@@ -69,6 +91,7 @@ export default defineConfig([
       file: 'dist/kawnix-preflight.js',
       format: 'esm',
     },
-    plugins: [esbuild()],
+    external,
+    plugins: plugins(),
   },
 ]);

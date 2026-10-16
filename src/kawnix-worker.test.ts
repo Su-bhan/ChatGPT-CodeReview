@@ -3,8 +3,8 @@ import {
   KawnixJobError,
   processNextKawnixJob,
   type KawnixJob,
-} from './kawnix-jobs';
-import { createInMemoryKawnixJobHandlers } from './kawnix-jobs';
+} from './kawnix-jobs.js';
+import { createInMemoryKawnixJobHandlers } from './kawnix-jobs.js';
 
 const job: KawnixJob = {
   id: 'job_worker',

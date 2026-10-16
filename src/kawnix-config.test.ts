@@ -1,4 +1,4 @@
-import { getKawnixConfigStatus, runKawnixPreflight } from './kawnix-config';
+import { getKawnixConfigStatus, runKawnixPreflight } from './kawnix-config.js';
 
 const completeEnvironment = {
   KAWNIX_PROVIDER_TOKEN: 'provider-token',

@@ -1,4 +1,4 @@
-import { handleKawnixProviderRequest } from './kawnix-provider';
+import { handleKawnixProviderRequest } from './kawnix-provider.js';
 
 const token = 'provider-test-token';
 

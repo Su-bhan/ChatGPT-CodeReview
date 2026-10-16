@@ -1,7 +1,7 @@
 import {
   InMemoryKawnixJobStore,
   runKawnixJob,
-} from './kawnix-jobs';
+} from './kawnix-jobs.js';
 
 const input = {
   operation: 'start' as const,
