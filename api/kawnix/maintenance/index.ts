@@ -2,7 +2,7 @@ import { InMemoryKawnixJobStore } from '../../../src/kawnix-jobs.js';
 import { PostgresKawnixJobStore } from '../../../src/postgres-kawnix-jobs.js';
 
 export const config = {
-  runtime: 'nodejs',
+  runtime: 'nodejs20.x',
 };
 
 const jobStore = process.env.DATABASE_URL
