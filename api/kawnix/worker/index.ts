@@ -12,7 +12,7 @@ import {
 import { getKawnixConfigStatus } from '../../../src/kawnix-config.js';
 
 export const config = {
-  runtime: 'nodejs20.x',
+  runtime: 'nodejs',
 };
 
 const jobStore = process.env.DATABASE_URL

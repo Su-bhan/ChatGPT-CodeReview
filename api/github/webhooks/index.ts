@@ -3,7 +3,7 @@ import { createNodeMiddleware, createProbot } from "probot";
 import { robot as app } from "../../../src/bot.js"
 
 export const config = {
-  runtime: 'nodejs20.x',
+  runtime: 'nodejs',
 };
 
 const probot = createProbot();
