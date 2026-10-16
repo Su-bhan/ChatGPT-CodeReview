@@ -1,5 +1,42 @@
 {
+  "version": 2,
   "framework": null,
   "installCommand": "npm ci --omit=dev",
-  "buildCommand": "npm run build"
+  "buildCommand": "npm run build",
+  "builds": [
+    {
+      "src": "dist/api/github/webhooks/index.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "dist/api/kawnix/invoke/index.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "dist/api/kawnix/worker/index.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "dist/api/kawnix/maintenance/index.js",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/github/webhooks(?:/)?",
+      "dest": "/dist/api/github/webhooks/index.js"
+    },
+    {
+      "src": "/api/kawnix/invoke(?:/)?",
+      "dest": "/dist/api/kawnix/invoke/index.js"
+    },
+    {
+      "src": "/api/kawnix/worker(?:/)?",
+      "dest": "/dist/api/kawnix/worker/index.js"
+    },
+    {
+      "src": "/api/kawnix/maintenance(?:/)?",
+      "dest": "/dist/api/kawnix/maintenance/index.js"
+    }
+  ]
 }
